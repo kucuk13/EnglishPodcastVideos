@@ -1,0 +1,13 @@
+# Environment variables (API keys)
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Temp files
+podcast_generator/temp/
+
+# Output videos
+*.mp4

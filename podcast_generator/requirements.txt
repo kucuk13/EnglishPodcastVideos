@@ -1,4 +1,5 @@
 anthropic>=0.39.0
+python-dotenv>=1.0.0
 TTS>=0.22.0
 pydub>=0.25.1
 moviepy>=2.0.0

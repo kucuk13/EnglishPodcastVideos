@@ -14,6 +14,11 @@ import sys
 import time
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Load .env file from project root (one level up from this script)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 # ── Logging ──────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
