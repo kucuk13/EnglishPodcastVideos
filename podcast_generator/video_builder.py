@@ -42,6 +42,28 @@ SUBTITLE_BG = (0, 0, 0)
 SUBTITLE_TEXT_COLOR = (255, 255, 255)
 
 
+_WINDOWS_FONT_DIR = Path("C:/Windows/Fonts")
+_FONT_CANDIDATES = {
+    "regular": ["arial.ttf", "LiberationSans-Regular.ttf", "DejaVuSans.ttf"],
+    "bold":    ["arialbd.ttf", "LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf"],
+}
+
+
+def _resolve_font(bold: bool = False) -> str:
+    """Return an absolute font path that Pillow can open, or a bare name as fallback."""
+    candidates = _FONT_CANDIDATES["bold" if bold else "regular"]
+    for name in candidates:
+        path = _WINDOWS_FONT_DIR / name
+        if path.exists():
+            return str(path)
+    # Last resort: let moviepy/pillow try by name (may still fail)
+    return "arial"
+
+
+FONT_REGULAR = _resolve_font(bold=False)
+FONT_BOLD    = _resolve_font(bold=True)
+
+
 def _word_wrap(text: str, width: int = 50) -> str:
     """Wrap text to the given character width."""
     return "\n".join(textwrap.wrap(text, width=width))
@@ -110,10 +132,10 @@ def _build_turn_clip(
 
     # --- Speaker label ---
     speaker_label = TextClip(
-        text=f"🎙  {speaker}",
+        text=f"  {speaker}",
         font_size=42,
         color=f"rgb({color[0]},{color[1]},{color[2]})",
-        font="Arial-Bold" if _font_exists("Arial-Bold") else "Arial",
+        font=FONT_BOLD,
         size=(WIDTH - 200, None),
         method="caption",
     ).with_duration(total_duration).with_position(("center", 60))
@@ -135,7 +157,7 @@ def _build_turn_clip(
         text=wrapped_text,
         font_size=30,
         color=f"rgb({TEXT_COLOR[0]},{TEXT_COLOR[1]},{TEXT_COLOR[2]})",
-        font="Arial",
+        font=FONT_REGULAR,
         size=(WIDTH - 160, None),
         method="caption",
         text_align="center",
@@ -154,7 +176,7 @@ def _build_turn_clip(
         text=subtitle_text_str,
         font_size=22,
         color=f"rgb({SUBTITLE_TEXT_COLOR[0]},{SUBTITLE_TEXT_COLOR[1]},{SUBTITLE_TEXT_COLOR[2]})",
-        font="Arial",
+        font=FONT_REGULAR,
         size=(WIDTH - 80, None),
         method="caption",
         text_align="center",
@@ -170,14 +192,6 @@ def _build_turn_clip(
 
     return CompositeVideoClip(layers, size=(WIDTH, HEIGHT)).with_duration(total_duration)
 
-
-def _font_exists(font_name: str) -> bool:
-    """Check if a font is available (best-effort)."""
-    try:
-        TextClip(text="x", font=font_name, font_size=10)
-        return True
-    except Exception:
-        return False
 
 
 def build_video(
