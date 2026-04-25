@@ -142,7 +142,7 @@ def _build_turn_clip(
     )
 
     # --- Pulsing dot (bottom-left of bar) ---
-    circle_size = 44
+    circle_size = 72
     dot_x = 44
     dot_y = bar_y + 16
 
@@ -232,11 +232,9 @@ def build_video(
         logger.info("Attaching audio track…")
         audio = AudioFileClip(str(combined_audio_path))
 
-        final_duration = min(video.duration, audio.duration)
+        final_duration = video.duration
 
-        video = video.subclipped(0, final_duration).with_audio(
-            audio.subclipped(0, final_duration)
-        )
+        video = video.subclipped(0, final_duration)
 
         logger.info("Exporting video to: %s", output_path)
 
@@ -245,8 +243,8 @@ def build_video(
             fps=FPS,
             codec="h264_nvenc", #libx264
             audio_codec="aac",
-            preset="p1",  # en hızlı NVENC preset
-            threads=4,
+            preset="p1",
+            audio=str(combined_audio_path),
             ffmpeg_params=[
                 "-rc", "vbr",
                 "-cq", "28",
