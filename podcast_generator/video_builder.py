@@ -126,28 +126,25 @@ def _build_turn_clip(
     # --- Background ---
     if background_image_path is not None:
         bg = ImageClip(str(background_image_path)).with_duration(total_duration)
-        # Semi-transparent dark overlay so text stays readable
-        overlay = (
-            ColorClip(size=(WIDTH, HEIGHT), color=(0, 0, 0))
-            .with_opacity(0.55)
-            .with_duration(total_duration)
-        )
-        base_layers = [bg, overlay]
+        base_layers = [bg]
     else:
         base_layers = [ColorClip(size=(WIDTH, HEIGHT), color=BG_COLOR).with_duration(total_duration)]
 
-    # --- Speaker label ---
-    speaker_label = TextClip(
-        text=f"  {speaker}",
-        font_size=42,
-        color=f"rgb({color[0]},{color[1]},{color[2]})",
-        font=FONT_BOLD,
-        size=(WIDTH - 200, None),
-        method="caption",
-    ).with_duration(total_duration).with_position(("center", 60))
+    # --- Bottom bar ---
+    BAR_HEIGHT = 150
+    bar_y = HEIGHT - BAR_HEIGHT  # 570
 
-    # --- Pulsing circle (animated, transparent background) ---
-    circle_size = 60
+    bar_bg = (
+        ColorClip(size=(WIDTH, BAR_HEIGHT), color=(0, 0, 0))
+        .with_opacity(0.72)
+        .with_duration(total_duration)
+        .with_position(("left", bar_y))
+    )
+
+    # --- Pulsing dot (bottom-left of bar) ---
+    circle_size = 44
+    dot_x = 44
+    dot_y = bar_y + 16
 
     def make_circle_rgb(t):
         return _create_pulsing_circle_frame(t, color, size=circle_size)[..., :3]
@@ -158,44 +155,33 @@ def _build_turn_clip(
     pulsing_circle = (
         VideoClip(make_circle_rgb, duration=total_duration)
         .with_mask(VideoClip(make_circle_mask, is_mask=True, duration=total_duration))
-        .with_position((100, 60))
+        .with_position((dot_x, dot_y))
     )
 
-    # --- Main dialogue text (word-wrapped, centered) ---
-    wrapped_text = _word_wrap(text, width=55)
-    main_text = TextClip(
-        text=wrapped_text,
-        font_size=30,
-        color=f"rgb({TEXT_COLOR[0]},{TEXT_COLOR[1]},{TEXT_COLOR[2]})",
-        font=FONT_REGULAR,
-        size=(WIDTH - 160, None),
+    # --- Speaker name (next to dot) ---
+    speaker_label = TextClip(
+        text=speaker,
+        font_size=32,
+        color=f"rgb({color[0]},{color[1]},{color[2]})",
+        font=FONT_BOLD,
+        size=(400, None),
         method="caption",
-        text_align="center",
-    ).with_duration(total_duration).with_position(("center", 180))
+    ).with_duration(total_duration).with_position((dot_x + circle_size + 12, bar_y + 18))
 
-    """
-    # --- Subtitle bar at bottom ---
-    sub_bg_color = tuple(int(c * 0.25) for c in SUBTITLE_BG)
-    subtitle_bg = ColorClip(
-        size=(WIDTH, 90), color=sub_bg_color
-    ).with_duration(total_duration).with_position(("center", HEIGHT - 90))
-
-    subtitle_text_str = text if len(text) <= 120 else text[:117] + "…"
+    # --- Subtitle text ---
     subtitle_text = TextClip(
-        text=subtitle_text_str,
-        font_size=22,
+        text=text,
+        font_size=26,
         color=f"rgb({SUBTITLE_TEXT_COLOR[0]},{SUBTITLE_TEXT_COLOR[1]},{SUBTITLE_TEXT_COLOR[2]})",
         font=FONT_REGULAR,
         size=(WIDTH - 80, None),
         method="caption",
-        text_align="center",
-    ).with_duration(total_duration).with_position(("center", HEIGHT - 75))
+        text_align="left",
+    ).with_duration(total_duration).with_position((40, bar_y + 72))
 
-    layers = [*base_layers, speaker_label, main_text, subtitle_bg, subtitle_text]
-    """
-    layers = [*base_layers, speaker_label, main_text]
+    layers = [*base_layers, bar_bg, speaker_label, subtitle_text]
     try:
-        layers.insert(len(base_layers), pulsing_circle)
+        layers.insert(len(base_layers) + 1, pulsing_circle)
     except Exception:
         logger.debug("Pulsing circle skipped (rendering issue).")
 
