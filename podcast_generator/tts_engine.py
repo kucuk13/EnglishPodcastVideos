@@ -16,14 +16,14 @@ logger = logging.getLogger(__name__)
 
 # edge-tts neural voices per speaker
 VOICE_MAP = {
-    "Alex": "en-US-GuyNeural",
-    "Jordan": "en-US-AriaNeural",
+    "Jack": "en-US-GuyNeural",
+    "Amy": "en-US-AriaNeural",
 }
 
 # OpenAI TTS voices per speaker
 OPENAI_VOICE_MAP = {
-    "Alex": "onyx",
-    "Jordan": "nova",
+    "Jack": "onyx",
+    "Amy": "nova",
 }
 
 
@@ -33,9 +33,9 @@ async def _synthesize_all(turns: list[dict], temp_dir: Path) -> list[Path]:
     output_paths: list[Path] = []
     for idx, turn in enumerate(tqdm(turns, desc="TTS synthesis", unit="turn")):
         speaker = turn["speaker"]
-        voice = VOICE_MAP.get(speaker, VOICE_MAP["Alex"])
+        voice = VOICE_MAP.get(speaker, VOICE_MAP["Jack"])
         if speaker not in VOICE_MAP:
-            logger.warning("Unknown speaker '%s' — falling back to Alex's voice.", speaker)
+            logger.warning("Unknown speaker '%s' — falling back to Jack's voice.", speaker)
 
         output_path = temp_dir / f"turn_{idx:04d}_{speaker.lower()}.mp3"
         communicate = edge_tts.Communicate(turn["text"], voice)
@@ -91,9 +91,9 @@ def _synthesize_all_openai(turns: list[dict], temp_dir: Path) -> list[Path]:
 
     for idx, turn in enumerate(tqdm(turns, desc="OpenAI TTS", unit="turn")):
         speaker = turn["speaker"]
-        voice = OPENAI_VOICE_MAP.get(speaker, OPENAI_VOICE_MAP["Alex"])
+        voice = OPENAI_VOICE_MAP.get(speaker, OPENAI_VOICE_MAP["Jack"])
         if speaker not in OPENAI_VOICE_MAP:
-            logger.warning("Unknown speaker '%s' — falling back to Alex's voice.", speaker)
+            logger.warning("Unknown speaker '%s' — falling back to Jack's voice.", speaker)
 
         output_path = temp_dir / f"turn_{idx:04d}_{speaker.lower()}.mp3"
         response = client.audio.speech.create(
@@ -112,8 +112,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     sample_turns = [
-        {"speaker": "Alex", "text": "Hello and welcome to our podcast!"},
-        {"speaker": "Jordan", "text": "Thanks for having me, it's great to be here."},
+        {"speaker": "Jack", "text": "Hello and welcome to our podcast!"},
+        {"speaker": "Amy", "text": "Thanks for having me, it's great to be here."},
     ]
     paths = synthesize_turns(sample_turns, "voices", "temp")
     for p in paths:

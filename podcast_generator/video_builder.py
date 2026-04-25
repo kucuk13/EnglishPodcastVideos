@@ -34,8 +34,8 @@ FPS = 24
 # Colors
 BG_COLOR = (18, 18, 24)
 SPEAKER_COLORS = {
-    "Alex": (100, 200, 255),      # Soft blue
-    "Jordan": (255, 160, 100),    # Warm orange
+    "Jack": (100, 200, 255),      # Soft blue
+    "Amy": (255, 160, 100),    # Warm orange
 }
 TEXT_COLOR = (230, 230, 240)
 SUBTITLE_BG = (0, 0, 0)

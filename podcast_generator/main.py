@@ -209,6 +209,8 @@ def main():
     print(f"  Level : {level}")
     print(f"  Words : ~{words}")
     print(f"  Output: {output}")
+    print(f"  TTS Type : {tts_type}")
+    print(f"  LLLM Type: {llm_type}")
     print("═" * 60)
     print()
 

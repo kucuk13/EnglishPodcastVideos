@@ -17,18 +17,6 @@ cd podcast_generator
 pip install -r requirements.txt
 ```
 
-### Voice Reference Files
-
-Place two short (5–15 s) clean speech `.wav` samples in the `voices/` folder:
-
-```
-voices/
-├── voice_alex.wav
-└── voice_jordan.wav
-```
-
-These are used by XTTS v2 for voice cloning — each speaker will sound like the corresponding reference.
-
 ## Usage
 
 ```bash
