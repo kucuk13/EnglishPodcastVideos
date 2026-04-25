@@ -74,7 +74,7 @@ def _create_pulsing_circle_frame(
     color: tuple[int, int, int],
     base_radius: int = 18,
     pulse_amplitude: int = 6,
-    pulse_speed: float = 2.5,
+    pulse_speed: float = 1.0,
     size: int = 60,
 ) -> np.ndarray:
     """Create a single frame of an animated pulsing circle (RGBA, uint8)."""
@@ -197,19 +197,6 @@ def build_video(
     gap_ms: int = 400,
     background_image_path: "Path | None" = None,
 ) -> Path:
-    """Assemble the final podcast video.
-
-    Args:
-        turns: List of dialogue turn dicts.
-        audio_paths: Per-turn wav paths (used for measuring durations).
-        combined_audio_path: Path to the full concatenated audio.
-        output_path: Path for the output mp4 file.
-        gap_ms: Inter-turn silence gap in milliseconds.
-        background_image_path: Optional 1280x720 image used as video background.
-
-    Returns:
-        Path to the output video file.
-    """
     from audio_mixer import get_segment_durations
 
     output_path = Path(output_path)
@@ -222,46 +209,73 @@ def build_video(
     logger.info("Measuring segment durations…")
     durations = get_segment_durations(audio_paths)
 
-    logger.info("Building video clips for %d turns…", len(turns))
+    if len(durations) != len(turns):
+        raise ValueError(f"turns={len(turns)} but durations={len(durations)}")
+
     clips = []
-    for idx, (turn, dur) in enumerate(zip(turns, durations)):
-        logger.debug("Clip %d: %s — %.1f s", idx, turn["speaker"], dur)
-        clip = _build_turn_clip(
-            turn,
-            dur,
-            gap_s if idx < len(turns) - 1 else 0,
-            background_image_path=background_image_path,
+    try:
+        logger.info("Building video clips for %d turns…", len(turns))
+
+        for idx, (turn, dur) in enumerate(zip(turns, durations)):
+            clip = _build_turn_clip(
+                turn,
+                dur,
+                gap_s if idx < len(turns) - 1 else 0,
+                background_image_path=background_image_path,
+            )
+            clips.append(clip)
+
+        logger.info("Concatenating video clips…")
+        video = concatenate_videoclips(clips, method="chain")
+
+        # Attach audio
+        logger.info("Attaching audio track…")
+        audio = AudioFileClip(str(combined_audio_path))
+
+        final_duration = min(video.duration, audio.duration)
+
+        video = video.subclipped(0, final_duration).with_audio(
+            audio.subclipped(0, final_duration)
         )
-        clips.append(clip)
 
-    logger.info("Concatenating video clips…")
-    video = concatenate_videoclips(clips, method="compose")
+        logger.info("Exporting video to: %s", output_path)
 
-    # Attach audio
-    logger.info("Attaching audio track…")
-    audio = AudioFileClip(str(combined_audio_path))
+        video.write_videofile(
+            str(output_path),
+            fps=FPS,
+            codec="h264_nvenc", #libx264
+            audio_codec="aac",
+            preset="p1",  # en hızlı NVENC preset
+            threads=4,
+            ffmpeg_params=[
+                "-rc", "vbr",
+                "-cq", "28",
+                "-b:v", "0",
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+            ],
+            logger="bar",
+        )
 
-    # If there's a duration mismatch, trim to the shorter one
-    final_duration = min(video.duration, audio.duration)
-    video = video.subclipped(0, final_duration)
-    audio = audio.subclipped(0, final_duration)
-    video = video.with_audio(audio)
+        logger.info("✅ Video exported: %s", output_path)
+        return output_path
 
-    total_min = final_duration / 60.0
-    logger.info("Final video: %.1f s (%.1f min)", final_duration, total_min)
+    finally:
+        for clip in clips:
+            try:
+                clip.close()
+            except Exception:
+                pass
 
-    logger.info("Exporting video to: %s", output_path)
-    video.write_videofile(
-        str(output_path),
-        fps=FPS,
-        codec="libx264",
-        audio_codec="aac",
-        threads=4,
-        logger="bar",
-    )
+        try:
+            video.close()
+        except Exception:
+            pass
 
-    logger.info("✅ Video exported: %s", output_path)
-    return output_path
+        try:
+            audio.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
