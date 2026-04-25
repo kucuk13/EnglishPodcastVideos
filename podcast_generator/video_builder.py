@@ -144,7 +144,7 @@ def _build_turn_clip(
     # --- Pulsing dot (left of bar, vertically centered with speaker name) ---
     circle_size = 72
     dot_x = 44
-    LABEL_FONT_SIZE = 32
+    LABEL_FONT_SIZE = 36
     HEADER_CENTER_Y = bar_y + 46   # shared vertical center for dot and label
     dot_y = HEADER_CENTER_Y - circle_size // 2   # top of 72px canvas → center lands on HEADER_CENTER_Y
 
@@ -168,19 +168,22 @@ def _build_turn_clip(
         font=FONT_BOLD,
         size=(400, None),
         method="caption",
-    ).with_duration(total_duration).with_position((dot_x + circle_size + 12, HEADER_CENTER_Y - LABEL_FONT_SIZE // 2))
+    ).with_duration(total_duration).with_position((dot_x + circle_size - 150, HEADER_CENTER_Y - LABEL_FONT_SIZE // 2))
 
     # --- Subtitle text ---
+    SUBTITLE_MARGIN = 60
+    subtitle_pixel_width = WIDTH - SUBTITLE_MARGIN * 2
+    wrapped_text = "\n".join(textwrap.wrap(text, width=subtitle_pixel_width // 20, break_long_words=False, break_on_hyphens=False))
     subtitle_text = TextClip(
-        text=text,
-        font_size=26,
+        text=wrapped_text,
+        font_size=32,
         color=f"rgb({SUBTITLE_TEXT_COLOR[0]},{SUBTITLE_TEXT_COLOR[1]},{SUBTITLE_TEXT_COLOR[2]})",
         font=FONT_REGULAR,
-        size=(WIDTH - 80, 130),
+        size=(WIDTH - SUBTITLE_MARGIN * 2, 130),
         method="caption",
         text_align="left",
         vertical_align="top",
-    ).with_duration(total_duration).with_position((40, bar_y + 82))
+    ).with_duration(total_duration).with_position((SUBTITLE_MARGIN - 10, bar_y + 82))
 
     layers = [*base_layers, bar_bg, speaker_label, subtitle_text]
     try:

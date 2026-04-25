@@ -56,12 +56,12 @@ def _get_settings_interactive():
     if not topic:
         topic = "Meeting New People"
 
-    level = input("  📊 Enter CEFR level (A1/A2/B1/B2/C1/C2) [B1]: ").strip().upper()
+    level = input("  📊 Enter CEFR level (A1/A2/B1/B2/C1/C2) [A2]: ").strip().upper()
     if not level:
-        level = "B1"
+        level = "A2"
 
-    words_input = input("  📝 Approximate word count [2000]: ").strip()
-    words = int(words_input) if words_input.isdigit() else 2000
+    words_input = input("  📝 Approximate word count [3000]: ").strip()
+    words = int(words_input) if words_input.isdigit() else 3000
 
     output = input("  💾 Output filename [output_podcast.mp4]: ").strip()
     if not output:
@@ -176,13 +176,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Example:\n"
-            '  python main.py --topic "Meeting New People" --level B1 --words 2000\n'
+            '  python main.py --topic "Meeting New People" --level A2 --words 3000\n'
             "  python main.py          (interactive mode)\n"
         ),
     )
     parser.add_argument("--topic", default=None, help="Podcast topic")
-    parser.add_argument("--level", default=None, help="CEFR English level (default: B1)")
-    parser.add_argument("--words", type=int, default=None, help="Approximate word count (default: 2000)")
+    parser.add_argument("--level", default=None, help="CEFR English level (default: A2)")
+    parser.add_argument("--words", type=int, default=None, help="Approximate word count (default: 3000)")
     parser.add_argument("--output", default=None, help="Output video filename (default: output_podcast.mp4)")
     parser.add_argument("--tts", type=int, choices=[1, 2], default=1, help="TTS engine: 1=edge-tts (default), 2=OpenAI TTS")
     parser.add_argument("--llm", type=int, choices=[1, 2], default=1, help="LLM engine: 1=Claude (default), 2=OpenAI")
@@ -193,8 +193,8 @@ def main():
         topic, level, words, output, tts_type, llm_type = _get_settings_interactive()
     else:
         topic = args.topic
-        level = args.level or "B1"
-        words = args.words or 2000
+        level = args.level or "A2"
+        words = args.words or 3000
         output = args.output or "output_podcast.mp4"
         tts_type = args.tts
         llm_type = args.llm
