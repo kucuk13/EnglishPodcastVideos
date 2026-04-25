@@ -121,11 +121,11 @@ def step3_mix_audio() -> Path:
 
 
 def step4_generate_background() -> Path | None:
-    """Generate AI background image via OpenAI DALL-E 3. Saves to temp/background.png.
+    """Generate AI background image via OpenAI GPT-IMAGE-1. Saves to temp/background.png.
 
     Returns the image path, or None if OPENAI_API_KEY is not set (graceful fallback).
     """
-    logger.info("━━━ STEP 4/5: Generating background image via DALL-E 3 ━━━")
+    logger.info("━━━ STEP 4/5: Generating background image via GPT-IMAGE-1 ━━━")
     from image_generator import generate_background_image
 
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))

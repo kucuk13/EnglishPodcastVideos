@@ -173,6 +173,7 @@ def _build_turn_clip(
         text_align="center",
     ).with_duration(total_duration).with_position(("center", 180))
 
+    """
     # --- Subtitle bar at bottom ---
     sub_bg_color = tuple(int(c * 0.25) for c in SUBTITLE_BG)
     subtitle_bg = ColorClip(
@@ -191,7 +192,8 @@ def _build_turn_clip(
     ).with_duration(total_duration).with_position(("center", HEIGHT - 75))
 
     layers = [*base_layers, speaker_label, main_text, subtitle_bg, subtitle_text]
-
+    """
+    layers = [*base_layers, speaker_label, main_text]
     try:
         layers.insert(len(base_layers), pulsing_circle)
     except Exception:

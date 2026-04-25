@@ -1,22 +1,22 @@
 """
-image_generator.py — OpenAI DALL-E 3 background image generation.
+image_generator.py — OpenAI gpt-image-1 background image generation.
 
 Generates a thematic 1280x720 background image for the podcast video.
 """
 
+import base64
 import io
 import logging
 import os
 from pathlib import Path
 
-import requests
 from PIL import Image
 
 logger = logging.getLogger(__name__)
 
 
 def generate_background_image(title: str, topic: str, output_path: Path) -> Path:
-    """Generate a thematic background image via OpenAI DALL-E 3.
+    """Generate a thematic background image via OpenAI gpt-image-1.
 
     Args:
         title: Episode title used to craft the generation prompt.
@@ -41,28 +41,24 @@ def generate_background_image(title: str, topic: str, output_path: Path) -> Path
     client = openai.OpenAI(api_key=api_key)
 
     prompt = (
-        f"A visually stunning, wide landscape background image for an English-learning podcast episode. "
-        f"Episode title: '{title}'. Topic: '{topic}'. "
-        "Style: cinematic, modern, slightly dark/moody so overlaid white text remains readable. "
-        "Abstract or thematic illustration — no text, no letters, no people, no faces. "
-        "Rich colors, depth, and visual interest. 16:9 aspect ratio."
+        f"Two friendly characters (a man and a woman) having a simple everyday conversation about {topic}."
+        "Scene includes a clear background related to the topic (cafe, airport, park, shop, etc)."
+        "Simple educational ESL comic illustration style."
+        "No speech bubbles."
+        "Cartoon style, 16:9 aspect ratio."
     )
 
-    logger.info("Calling DALL-E 3 to generate background image…")
+    logger.info("Calling gpt-image-1 to generate background image…")
     response = client.images.generate(
-        model="dall-e-3",
+        model="gpt-image-1",
         prompt=prompt,
-        size="1792x1024",
-        quality="standard",
+        size="1536x1024",
+        quality="medium",
         n=1,
     )
 
-    image_url = response.data[0].url
-    logger.info("Downloading generated image from OpenAI…")
-    img_bytes = requests.get(image_url, timeout=60)
-    img_bytes.raise_for_status()
-
-    img = Image.open(io.BytesIO(img_bytes.content)).convert("RGB")
+    image_data = base64.b64decode(response.data[0].b64_json)
+    img = Image.open(io.BytesIO(image_data)).convert("RGB")
     img = img.resize((1280, 720), Image.LANCZOS)
     img.save(output_path, "PNG")
 
