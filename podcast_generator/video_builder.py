@@ -131,8 +131,8 @@ def _build_turn_clip(
         base_layers = [ColorClip(size=(WIDTH, HEIGHT), color=BG_COLOR).with_duration(total_duration)]
 
     # --- Bottom bar ---
-    BAR_HEIGHT = 150
-    bar_y = HEIGHT - BAR_HEIGHT  # 570
+    BAR_HEIGHT = 210
+    bar_y = HEIGHT - BAR_HEIGHT  # 510
 
     bar_bg = (
         ColorClip(size=(WIDTH, BAR_HEIGHT), color=(0, 0, 0))
@@ -141,10 +141,12 @@ def _build_turn_clip(
         .with_position(("left", bar_y))
     )
 
-    # --- Pulsing dot (bottom-left of bar) ---
+    # --- Pulsing dot (left of bar, vertically centered with speaker name) ---
     circle_size = 72
     dot_x = 44
-    dot_y = bar_y + 16
+    LABEL_FONT_SIZE = 32
+    HEADER_CENTER_Y = bar_y + 46   # shared vertical center for dot and label
+    dot_y = HEADER_CENTER_Y - circle_size // 2   # top of 72px canvas → center lands on HEADER_CENTER_Y
 
     def make_circle_rgb(t):
         return _create_pulsing_circle_frame(t, color, size=circle_size)[..., :3]
@@ -158,15 +160,15 @@ def _build_turn_clip(
         .with_position((dot_x, dot_y))
     )
 
-    # --- Speaker name (next to dot) ---
+    # --- Speaker name (next to dot, top aligned so text center ≈ HEADER_CENTER_Y) ---
     speaker_label = TextClip(
         text=speaker,
-        font_size=32,
+        font_size=LABEL_FONT_SIZE,
         color=f"rgb({color[0]},{color[1]},{color[2]})",
         font=FONT_BOLD,
         size=(400, None),
         method="caption",
-    ).with_duration(total_duration).with_position((dot_x + circle_size + 12, bar_y + 18))
+    ).with_duration(total_duration).with_position((dot_x + circle_size + 12, HEADER_CENTER_Y - LABEL_FONT_SIZE // 2))
 
     # --- Subtitle text ---
     subtitle_text = TextClip(
@@ -174,10 +176,11 @@ def _build_turn_clip(
         font_size=26,
         color=f"rgb({SUBTITLE_TEXT_COLOR[0]},{SUBTITLE_TEXT_COLOR[1]},{SUBTITLE_TEXT_COLOR[2]})",
         font=FONT_REGULAR,
-        size=(WIDTH - 80, None),
+        size=(WIDTH - 80, 130),
         method="caption",
         text_align="left",
-    ).with_duration(total_duration).with_position((40, bar_y + 72))
+        vertical_align="top",
+    ).with_duration(total_duration).with_position((40, bar_y + 82))
 
     layers = [*base_layers, bar_bg, speaker_label, subtitle_text]
     try:
