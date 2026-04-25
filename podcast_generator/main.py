@@ -67,19 +67,22 @@ def _get_settings_interactive():
     if not output:
         output = "output_podcast.mp4"
 
+    llm_input = input("  🤖 LLM engine  — 1: Claude         2: OpenAI       [1]: ").strip()
+    llm_type = 2 if llm_input == "2" else 1
+
     tts_input = input("  🔊 TTS engine — 1: edge-tts (free)  2: OpenAI TTS [1]: ").strip()
     tts_type = 2 if tts_input == "2" else 1
 
-    return topic, level, words, output, tts_type
+    return topic, level, words, output, tts_type, llm_type
 
 
-def step1_generate_script(topic: str, level: str, words: int) -> dict:
+def step1_generate_script(topic: str, level: str, words: int, llm_type: int) -> dict:
     """Generate podcast script via Claude API. Saves to temp/script.json."""
-    logger.info("━━━ STEP 1/5: Generating podcast script via Claude API ━━━")
+    logger.info("━━━ STEP 1/5: Generating podcast script via API ━━━")
     from script_generator import generate_script
 
     _clean_temp()
-    script = generate_script(topic, level, words)
+    script = generate_script(topic, level, words, llm_type)
     turns = script["turns"]
     total_words = sum(len(t["text"].split()) for t in turns)
 
@@ -182,17 +185,19 @@ def main():
     parser.add_argument("--words", type=int, default=None, help="Approximate word count (default: 2000)")
     parser.add_argument("--output", default=None, help="Output video filename (default: output_podcast.mp4)")
     parser.add_argument("--tts", type=int, choices=[1, 2], default=1, help="TTS engine: 1=edge-tts (default), 2=OpenAI TTS")
+    parser.add_argument("--llm", type=int, choices=[1, 2], default=1, help="LLM engine: 1=Claude (default), 2=OpenAI")
 
     args = parser.parse_args()
 
     if args.topic is None:
-        topic, level, words, output, tts_type = _get_settings_interactive()
+        topic, level, words, output, tts_type, llm_type = _get_settings_interactive()
     else:
         topic = args.topic
         level = args.level or "B1"
         words = args.words or 2000
         output = args.output or "output_podcast.mp4"
         tts_type = args.tts
+        llm_type = args.llm
 
     t_start = time.time()
 
@@ -207,7 +212,7 @@ def main():
     print("═" * 60)
     print()
 
-    step1_generate_script(topic, level, words)
+    step1_generate_script(topic, level, words, llm_type)
     step2_synthesize_speech(tts_type=tts_type)
     step3_mix_audio()
     step4_generate_background()
