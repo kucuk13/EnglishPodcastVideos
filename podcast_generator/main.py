@@ -73,7 +73,7 @@ def _get_settings_interactive():
 
 def step1_generate_script(topic: str, level: str, words: int) -> dict:
     """Generate podcast script via Claude API. Saves to temp/script.json."""
-    logger.info("━━━ STEP 1/4: Generating podcast script via Claude API ━━━")
+    logger.info("━━━ STEP 1/5: Generating podcast script via Claude API ━━━")
     from script_generator import generate_script
 
     _clean_temp()
@@ -93,7 +93,7 @@ def step1_generate_script(topic: str, level: str, words: int) -> dict:
 
 def step2_synthesize_speech() -> list[Path]:
     """Synthesize TTS audio. Reads temp/script.json, saves temp/audio_paths.json."""
-    logger.info("━━━ STEP 2/4: Synthesizing speech with XTTS v2 ━━━")
+    logger.info("━━━ STEP 2/5: Synthesizing speech with XTTS v2 ━━━")
     from tts_engine import synthesize_turns
 
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
@@ -108,7 +108,7 @@ def step2_synthesize_speech() -> list[Path]:
 
 def step3_mix_audio() -> Path:
     """Concatenate per-turn audio. Reads temp/audio_paths.json, writes temp/combined.wav."""
-    logger.info("━━━ STEP 3/4: Mixing audio ━━━")
+    logger.info("━━━ STEP 3/5: Mixing audio ━━━")
     from audio_mixer import concatenate_audio
 
     audio_paths = [
@@ -120,9 +120,28 @@ def step3_mix_audio() -> Path:
     return combined_audio
 
 
-def step4_build_video(output: str | Path) -> Path:
+def step4_generate_background() -> Path | None:
+    """Generate AI background image via OpenAI DALL-E 3. Saves to temp/background.png.
+
+    Returns the image path, or None if OPENAI_API_KEY is not set (graceful fallback).
+    """
+    logger.info("━━━ STEP 4/5: Generating background image via DALL-E 3 ━━━")
+    from image_generator import generate_background_image
+
+    script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
+    bg_path = TEMP_DIR / "background.png"
+
+    try:
+        generate_background_image(script["title"], script.get("topic", ""), bg_path)
+        return bg_path
+    except RuntimeError as exc:
+        logger.warning("Background image skipped: %s", exc)
+        return None
+
+
+def step5_build_video(output: str | Path) -> Path:
     """Render the final video. Reads all inputs from temp/. Returns output path."""
-    logger.info("━━━ STEP 4/4: Building video ━━━")
+    logger.info("━━━ STEP 5/5: Building video ━━━")
     from video_builder import build_video
 
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
@@ -131,9 +150,17 @@ def step4_build_video(output: str | Path) -> Path:
         for p in json.loads((TEMP_DIR / "audio_paths.json").read_text(encoding="utf-8"))
     ]
     combined_audio = TEMP_DIR / "combined.wav"
+    background_path = TEMP_DIR / "background.png"
 
     output_path = Path(output)
-    build_video(script["turns"], audio_paths, combined_audio, output_path, gap_ms=400)
+    build_video(
+        script["turns"],
+        audio_paths,
+        combined_audio,
+        output_path,
+        gap_ms=400,
+        background_image_path=background_path if background_path.exists() else None,
+    )
     return output_path
 
 
@@ -178,7 +205,8 @@ def main():
     step1_generate_script(topic, level, words)
     step2_synthesize_speech()
     step3_mix_audio()
-    output_path = step4_build_video(output)
+    step4_generate_background()
+    output_path = step5_build_video(output)
 
     elapsed = time.time() - t_start
     print()

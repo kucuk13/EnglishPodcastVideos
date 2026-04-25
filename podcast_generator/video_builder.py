@@ -77,7 +77,7 @@ def _create_pulsing_circle_frame(
     pulse_speed: float = 2.5,
     size: int = 60,
 ) -> np.ndarray:
-    """Create a single frame of an animated pulsing circle (RGB, uint8)."""
+    """Create a single frame of an animated pulsing circle (RGBA, uint8)."""
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
@@ -87,32 +87,27 @@ def _create_pulsing_circle_frame(
 
     # Outer glow
     glow_radius = radius + 6
-    glow_color = (*color, 60)
     draw.ellipse(
         [center - glow_radius, center - glow_radius,
          center + glow_radius, center + glow_radius],
-        fill=glow_color,
+        fill=(*color, 60),
     )
 
     # Main circle
-    main_color = (*color, 220)
     draw.ellipse(
         [center - radius, center - radius,
          center + radius, center + radius],
-        fill=main_color,
+        fill=(*color, 220),
     )
 
-    # Composite onto a solid background matching the video BG
-    bg = Image.new("RGBA", (size, size), (*BG_COLOR, 255))
-    composited = Image.alpha_composite(bg, img)
-
-    return np.array(composited.convert("RGB"))
+    return np.array(img)  # (H, W, 4) RGBA — transparent background
 
 
 def _build_turn_clip(
     turn: dict,
     duration: float,
     gap_s: float,
+    background_image_path: "Path | None" = None,
 ) -> CompositeVideoClip:
     """Build a single clip for one dialogue turn.
 
@@ -120,6 +115,7 @@ def _build_turn_clip(
         turn: Dict with 'speaker' and 'text'.
         duration: Duration of this turn's audio in seconds.
         gap_s: Inter-turn gap in seconds (added after audio).
+        background_image_path: Optional path to a 1280x720 background image.
     """
     speaker = turn["speaker"]
     text = turn["text"]
@@ -127,8 +123,18 @@ def _build_turn_clip(
 
     color = SPEAKER_COLORS.get(speaker, (200, 200, 200))
 
-    # Background
-    bg = ColorClip(size=(WIDTH, HEIGHT), color=BG_COLOR).with_duration(total_duration)
+    # --- Background ---
+    if background_image_path is not None:
+        bg = ImageClip(str(background_image_path)).with_duration(total_duration)
+        # Semi-transparent dark overlay so text stays readable
+        overlay = (
+            ColorClip(size=(WIDTH, HEIGHT), color=(0, 0, 0))
+            .with_opacity(0.55)
+            .with_duration(total_duration)
+        )
+        base_layers = [bg, overlay]
+    else:
+        base_layers = [ColorClip(size=(WIDTH, HEIGHT), color=BG_COLOR).with_duration(total_duration)]
 
     # --- Speaker label ---
     speaker_label = TextClip(
@@ -140,14 +146,18 @@ def _build_turn_clip(
         method="caption",
     ).with_duration(total_duration).with_position(("center", 60))
 
-    # --- Pulsing circle (animated via VideoClip) ---
+    # --- Pulsing circle (animated, transparent background) ---
     circle_size = 60
 
-    def make_circle_frame(t):
-        return _create_pulsing_circle_frame(t, color, size=circle_size)
+    def make_circle_rgb(t):
+        return _create_pulsing_circle_frame(t, color, size=circle_size)[..., :3]
+
+    def make_circle_mask(t):
+        return _create_pulsing_circle_frame(t, color, size=circle_size)[..., 3] / 255.0
 
     pulsing_circle = (
-        VideoClip(make_circle_frame, duration=total_duration)
+        VideoClip(make_circle_rgb, duration=total_duration)
+        .with_mask(VideoClip(make_circle_mask, is_mask=True, duration=total_duration))
         .with_position((100, 60))
     )
 
@@ -164,13 +174,11 @@ def _build_turn_clip(
     ).with_duration(total_duration).with_position(("center", 180))
 
     # --- Subtitle bar at bottom ---
-    # Create semi-transparent subtitle background by blending with BG color
-    sub_bg_color = tuple(int(c * 0.25) for c in SUBTITLE_BG)  # darken
+    sub_bg_color = tuple(int(c * 0.25) for c in SUBTITLE_BG)
     subtitle_bg = ColorClip(
         size=(WIDTH, 90), color=sub_bg_color
     ).with_duration(total_duration).with_position(("center", HEIGHT - 90))
 
-    # Truncate long text for subtitle
     subtitle_text_str = text if len(text) <= 120 else text[:117] + "…"
     subtitle_text = TextClip(
         text=subtitle_text_str,
@@ -182,11 +190,10 @@ def _build_turn_clip(
         text_align="center",
     ).with_duration(total_duration).with_position(("center", HEIGHT - 75))
 
-    layers = [bg, speaker_label, main_text, subtitle_bg, subtitle_text]
+    layers = [*base_layers, speaker_label, main_text, subtitle_bg, subtitle_text]
 
-    # Try adding the pulsing circle — fall back gracefully
     try:
-        layers.insert(2, pulsing_circle)
+        layers.insert(len(base_layers), pulsing_circle)
     except Exception:
         logger.debug("Pulsing circle skipped (rendering issue).")
 
@@ -200,6 +207,7 @@ def build_video(
     combined_audio_path: str | Path,
     output_path: str | Path,
     gap_ms: int = 400,
+    background_image_path: "Path | None" = None,
 ) -> Path:
     """Assemble the final podcast video.
 
@@ -209,6 +217,7 @@ def build_video(
         combined_audio_path: Path to the full concatenated audio.
         output_path: Path for the output mp4 file.
         gap_ms: Inter-turn silence gap in milliseconds.
+        background_image_path: Optional 1280x720 image used as video background.
 
     Returns:
         Path to the output video file.
@@ -219,6 +228,9 @@ def build_video(
     combined_audio_path = Path(combined_audio_path)
     gap_s = gap_ms / 1000.0
 
+    if background_image_path:
+        logger.info("Using background image: %s", background_image_path)
+
     logger.info("Measuring segment durations…")
     durations = get_segment_durations(audio_paths)
 
@@ -226,7 +238,12 @@ def build_video(
     clips = []
     for idx, (turn, dur) in enumerate(zip(turns, durations)):
         logger.debug("Clip %d: %s — %.1f s", idx, turn["speaker"], dur)
-        clip = _build_turn_clip(turn, dur, gap_s if idx < len(turns) - 1 else 0)
+        clip = _build_turn_clip(
+            turn,
+            dur,
+            gap_s if idx < len(turns) - 1 else 0,
+            background_image_path=background_image_path,
+        )
         clips.append(clip)
 
     logger.info("Concatenating video clips…")
