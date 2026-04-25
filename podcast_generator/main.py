@@ -71,8 +71,73 @@ def _get_settings_interactive():
     return topic, level, words, output
 
 
+def step1_generate_script(topic: str, level: str, words: int) -> dict:
+    """Generate podcast script via Claude API. Saves to temp/script.json."""
+    logger.info("━━━ STEP 1/4: Generating podcast script via Claude API ━━━")
+    from script_generator import generate_script
+
+    _clean_temp()
+    script = generate_script(topic, level, words)
+    turns = script["turns"]
+    total_words = sum(len(t["text"].split()) for t in turns)
+
+    logger.info("Title: \"%s\"", script["title"])
+    logger.info("Turns: %d  |  Words: ~%d", len(turns), total_words)
+
+    (TEMP_DIR / "script.json").write_text(
+        json.dumps(script, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    logger.info("Script saved: %s", TEMP_DIR / "script.json")
+    return script
+
+
+def step2_synthesize_speech() -> list[Path]:
+    """Synthesize TTS audio. Reads temp/script.json, saves temp/audio_paths.json."""
+    logger.info("━━━ STEP 2/4: Synthesizing speech with XTTS v2 ━━━")
+    from tts_engine import synthesize_turns
+
+    script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
+    audio_paths = synthesize_turns(script["turns"], VOICES_DIR, TEMP_DIR)
+
+    (TEMP_DIR / "audio_paths.json").write_text(
+        json.dumps([str(p) for p in audio_paths], indent=2), encoding="utf-8"
+    )
+    logger.info("Generated %d audio segments.", len(audio_paths))
+    return audio_paths
+
+
+def step3_mix_audio() -> Path:
+    """Concatenate per-turn audio. Reads temp/audio_paths.json, writes temp/combined.wav."""
+    logger.info("━━━ STEP 3/4: Mixing audio ━━━")
+    from audio_mixer import concatenate_audio
+
+    audio_paths = [
+        Path(p)
+        for p in json.loads((TEMP_DIR / "audio_paths.json").read_text(encoding="utf-8"))
+    ]
+    combined_audio = TEMP_DIR / "combined.wav"
+    concatenate_audio(audio_paths, combined_audio, gap_ms=400)
+    return combined_audio
+
+
+def step4_build_video(output: str | Path) -> Path:
+    """Render the final video. Reads all inputs from temp/. Returns output path."""
+    logger.info("━━━ STEP 4/4: Building video ━━━")
+    from video_builder import build_video
+
+    script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
+    audio_paths = [
+        Path(p)
+        for p in json.loads((TEMP_DIR / "audio_paths.json").read_text(encoding="utf-8"))
+    ]
+    combined_audio = TEMP_DIR / "combined.wav"
+
+    output_path = Path(output)
+    build_video(script["turns"], audio_paths, combined_audio, output_path, gap_ms=400)
+    return output_path
+
+
 def main():
-    # Support both CLI flags and interactive mode
     parser = argparse.ArgumentParser(
         description="Generate a full English podcast video from a topic. (default: Meeting New People)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -83,21 +148,12 @@ def main():
         ),
     )
     parser.add_argument("--topic", default=None, help="Podcast topic")
-    parser.add_argument(
-        "--level", default=None, help="CEFR English level (default: B1)"
-    )
-    parser.add_argument(
-        "--words", type=int, default=None,
-        help="Approximate word count (default: 2000)",
-    )
-    parser.add_argument(
-        "--output", default=None,
-        help="Output video filename (default: output_podcast.mp4)",
-    )
+    parser.add_argument("--level", default=None, help="CEFR English level (default: B1)")
+    parser.add_argument("--words", type=int, default=None, help="Approximate word count (default: 2000)")
+    parser.add_argument("--output", default=None, help="Output video filename (default: output_podcast.mp4)")
 
     args = parser.parse_args()
 
-    # If --topic was not provided, switch to interactive mode
     if args.topic is None:
         topic, level, words, output = _get_settings_interactive()
     else:
@@ -119,45 +175,11 @@ def main():
     print("═" * 60)
     print()
 
-    # ── Step 1: Generate script ──────────────────────────────────────
-    logger.info("━━━ STEP 1/4: Generating podcast script via Claude API ━━━")
-    from script_generator import generate_script
+    step1_generate_script(topic, level, words)
+    step2_synthesize_speech()
+    step3_mix_audio()
+    output_path = step4_build_video(output)
 
-    script = generate_script(topic, level, words)
-    turns = script["turns"]
-    total_words = sum(len(t["text"].split()) for t in turns)
-
-    logger.info("Title: \"%s\"", script["title"])
-    logger.info("Turns: %d  |  Words: ~%d", len(turns), total_words)
-
-    # Save script to temp for reference
-    _clean_temp()
-    script_path = TEMP_DIR / "script.json"
-    script_path.write_text(json.dumps(script, indent=2, ensure_ascii=False), encoding="utf-8")
-    logger.info("Script saved: %s", script_path)
-
-    # ── Step 2: Text-to-Speech ───────────────────────────────────────
-    logger.info("━━━ STEP 2/4: Synthesizing speech with XTTS v2 ━━━")
-    from tts_engine import synthesize_turns
-
-    audio_paths = synthesize_turns(turns, VOICES_DIR, TEMP_DIR)
-    logger.info("Generated %d audio segments.", len(audio_paths))
-
-    # ── Step 3: Audio mixing ─────────────────────────────────────────
-    logger.info("━━━ STEP 3/4: Mixing audio ━━━")
-    from audio_mixer import concatenate_audio
-
-    combined_audio = TEMP_DIR / "combined.wav"
-    concatenate_audio(audio_paths, combined_audio, gap_ms=400)
-
-    # ── Step 4: Video generation ─────────────────────────────────────
-    logger.info("━━━ STEP 4/4: Building video ━━━")
-    from video_builder import build_video
-
-    output_path = Path(output)
-    build_video(turns, audio_paths, combined_audio, output_path, gap_ms=400)
-
-    # ── Done ─────────────────────────────────────────────────────────
     elapsed = time.time() - t_start
     print()
     print("═" * 60)
