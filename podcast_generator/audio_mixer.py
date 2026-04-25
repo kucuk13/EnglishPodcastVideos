@@ -37,7 +37,7 @@ def concatenate_audio(
     logger.info("Concatenating %d audio segments (gap=%d ms)…", len(wav_paths), gap_ms)
 
     for idx, wav_path in enumerate(wav_paths):
-        segment = AudioSegment.from_wav(str(wav_path))
+        segment = AudioSegment.from_file(str(wav_path))
         logger.debug(
             "Segment %d: %s — %.1f s",
             idx, wav_path.name, len(segment) / 1000.0,
@@ -67,7 +67,7 @@ def get_segment_durations(wav_paths: list[Path]) -> list[float]:
     """
     durations = []
     for wav_path in wav_paths:
-        segment = AudioSegment.from_wav(str(wav_path))
+        segment = AudioSegment.from_file(str(wav_path))
         durations.append(len(segment) / 1000.0)
     return durations
 

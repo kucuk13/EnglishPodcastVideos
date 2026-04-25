@@ -53,9 +53,9 @@ def _get_settings_interactive():
     print("═" * 60)
     print()
 
-    topic = input("  📌 Enter podcast topic: ").strip()
-    while not topic:
-        topic = input("  ⚠  Topic cannot be empty. Try again: ").strip()
+    topic = input("  📌 Enter podcast topic [Meeting New People]: ").strip()
+    if not topic:
+        topic = "Meeting New People"
 
     level = input("  📊 Enter CEFR level (A1/A2/B1/B2/C1/C2) [B1]: ").strip().upper()
     if not level:
@@ -74,11 +74,11 @@ def _get_settings_interactive():
 def main():
     # Support both CLI flags and interactive mode
     parser = argparse.ArgumentParser(
-        description="Generate a full English podcast video from a topic.",
+        description="Generate a full English podcast video from a topic. (default: Meeting New People)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Example:\n"
-            '  python main.py --topic "Meeting People" --level B1 --words 2000\n'
+            '  python main.py --topic "Meeting New People" --level B1 --words 2000\n'
             "  python main.py          (interactive mode)\n"
         ),
     )

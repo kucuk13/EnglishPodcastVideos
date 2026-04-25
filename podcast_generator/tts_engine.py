@@ -1,10 +1,11 @@
 """
-tts_engine.py — Coqui XTTS v2 voice synthesis per dialogue turn.
+tts_engine.py — Microsoft Edge TTS voice synthesis per dialogue turn.
 
-Loads the XTTS v2 model once and synthesizes each turn using the
-matching speaker's reference voice file.
+Uses edge-tts (free, Python 3.12 compatible) with distinct neural voices
+per speaker. No reference audio or GPU required.
 """
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -12,86 +13,53 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-# Map speaker names to voice reference filenames
+# Preset neural voices per speaker
 VOICE_MAP = {
-    "Alex": "voice_alex.wav",
-    "Jordan": "voice_jordan.wav",
+    "Alex": "en-US-GuyNeural",
+    "Jordan": "en-US-AriaNeural",
 }
+
+
+async def _synthesize_all(turns: list[dict], temp_dir: Path) -> list[Path]:
+    import edge_tts
+
+    output_paths: list[Path] = []
+    for idx, turn in enumerate(tqdm(turns, desc="TTS synthesis", unit="turn")):
+        speaker = turn["speaker"]
+        voice = VOICE_MAP.get(speaker, VOICE_MAP["Alex"])
+        if speaker not in VOICE_MAP:
+            logger.warning("Unknown speaker '%s' — falling back to Alex's voice.", speaker)
+
+        output_path = temp_dir / f"turn_{idx:04d}_{speaker.lower()}.mp3"
+        communicate = edge_tts.Communicate(turn["text"], voice)
+        await communicate.save(str(output_path))
+        output_paths.append(output_path)
+
+    return output_paths
 
 
 def synthesize_turns(
     turns: list[dict],
-    voices_dir: str | Path,
+    _voices_dir: str | Path,
     temp_dir: str | Path,
-    language: str = "en",
+    _language: str = "en",
 ) -> list[Path]:
-    """Synthesize each dialogue turn to a wav file using XTTS v2.
+    """Synthesize each dialogue turn to an mp3 file using edge-tts.
 
     Args:
         turns: List of dicts with 'speaker' and 'text' keys.
-        voices_dir: Path to directory containing reference voice wav files.
-        temp_dir: Path to directory for temporary output wav files.
-        language: Language code for TTS (default: "en").
+        voices_dir: Unused — kept for API compatibility with main.py.
+        temp_dir: Path to directory for temporary output files.
+        language: Unused — edge-tts voices are language-specific by name.
 
     Returns:
-        Ordered list of Path objects pointing to generated wav files.
+        Ordered list of Path objects pointing to generated mp3 files.
     """
-    from TTS.api import TTS
-
-    voices_dir = Path(voices_dir)
     temp_dir = Path(temp_dir)
     temp_dir.mkdir(parents=True, exist_ok=True)
 
-    # Validate voice files exist
-    for speaker, filename in VOICE_MAP.items():
-        voice_path = voices_dir / filename
-        if not voice_path.exists():
-            raise FileNotFoundError(
-                f"Reference voice file not found: {voice_path}\n"
-                f"Please place a short .wav sample for {speaker} at this path."
-            )
-
-    logger.info("Loading XTTS v2 model (this may take a moment on first run)…")
-    tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
-
-    # Move to GPU if available
-    try:
-        tts.to("cuda")
-        logger.info("Using GPU for TTS inference.")
-    except Exception:
-        logger.info("GPU not available, using CPU (this will be slower).")
-
-    output_paths: list[Path] = []
-
-    logger.info("Synthesizing %d dialogue turns…", len(turns))
-    for idx, turn in enumerate(tqdm(turns, desc="TTS synthesis", unit="turn")):
-        speaker = turn["speaker"]
-        text = turn["text"]
-
-        voice_filename = VOICE_MAP.get(speaker)
-        if voice_filename is None:
-            logger.warning(
-                "Unknown speaker '%s' — falling back to Alex's voice.", speaker
-            )
-            voice_filename = VOICE_MAP["Alex"]
-
-        reference_wav = str(voices_dir / voice_filename)
-        output_path = temp_dir / f"turn_{idx:04d}_{speaker.lower()}.wav"
-
-        logger.debug(
-            "Turn %d: %s — %d chars, ref=%s",
-            idx, speaker, len(text), voice_filename,
-        )
-
-        tts.tts_to_file(
-            text=text,
-            speaker_wav=reference_wav,
-            language=language,
-            file_path=str(output_path),
-        )
-
-        output_paths.append(output_path)
-
+    logger.info("Synthesizing %d dialogue turns with edge-tts…", len(turns))
+    output_paths = asyncio.run(_synthesize_all(turns, temp_dir))
     logger.info("All %d turns synthesized successfully.", len(output_paths))
     return output_paths
 

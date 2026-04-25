@@ -1,7 +1,7 @@
 """
 script_generator.py — Claude API dialogue generation.
 
-Calls claude-sonnet-4-20250514 to produce a two-person podcast dialogue
+Calls Claude to produce a two-person podcast dialogue
 in strict JSON format.
 """
 
@@ -79,7 +79,7 @@ def generate_script(
         logger.info("Claude API call attempt %d/%d …", attempt, max_retries)
 
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5",
             max_tokens=8192,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
