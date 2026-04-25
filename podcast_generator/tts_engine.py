@@ -1,8 +1,9 @@
 """
-tts_engine.py — Microsoft Edge TTS voice synthesis per dialogue turn.
+tts_engine.py — TTS voice synthesis per dialogue turn.
 
-Uses edge-tts (free, Python 3.12 compatible) with distinct neural voices
-per speaker. No reference audio or GPU required.
+Supports two backends:
+  1 — edge-tts (free, no API key required)
+  2 — OpenAI TTS API (requires OPENAI_API_KEY)
 """
 
 import asyncio
@@ -13,10 +14,16 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-# Preset neural voices per speaker
+# edge-tts neural voices per speaker
 VOICE_MAP = {
     "Alex": "en-US-GuyNeural",
     "Jordan": "en-US-AriaNeural",
+}
+
+# OpenAI TTS voices per speaker
+OPENAI_VOICE_MAP = {
+    "Alex": "onyx",
+    "Jordan": "nova",
 }
 
 
@@ -43,14 +50,16 @@ def synthesize_turns(
     _voices_dir: str | Path,
     temp_dir: str | Path,
     _language: str = "en",
+    tts_type: int = 1,
 ) -> list[Path]:
-    """Synthesize each dialogue turn to an mp3 file using edge-tts.
+    """Synthesize each dialogue turn to an mp3 file.
 
     Args:
         turns: List of dicts with 'speaker' and 'text' keys.
-        voices_dir: Unused — kept for API compatibility with main.py.
+        _voices_dir: Unused — kept for API compatibility.
         temp_dir: Path to directory for temporary output files.
-        language: Unused — edge-tts voices are language-specific by name.
+        _language: Unused — voices are language-specific by name.
+        tts_type: 1 = edge-tts (free), 2 = OpenAI TTS API.
 
     Returns:
         Ordered list of Path objects pointing to generated mp3 files.
@@ -58,9 +67,43 @@ def synthesize_turns(
     temp_dir = Path(temp_dir)
     temp_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Synthesizing %d dialogue turns with edge-tts…", len(turns))
-    output_paths = asyncio.run(_synthesize_all(turns, temp_dir))
+    if tts_type == 2:
+        logger.info("Synthesizing %d dialogue turns with OpenAI TTS…", len(turns))
+        output_paths = _synthesize_all_openai(turns, temp_dir)
+    else:
+        logger.info("Synthesizing %d dialogue turns with edge-tts…", len(turns))
+        output_paths = asyncio.run(_synthesize_all(turns, temp_dir))
+
     logger.info("All %d turns synthesized successfully.", len(output_paths))
+    return output_paths
+
+
+def _synthesize_all_openai(turns: list[dict], temp_dir: Path) -> list[Path]:
+    import os
+    import openai
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set — cannot use OpenAI TTS (type 2).")
+
+    client = openai.OpenAI(api_key=api_key)
+    output_paths: list[Path] = []
+
+    for idx, turn in enumerate(tqdm(turns, desc="OpenAI TTS", unit="turn")):
+        speaker = turn["speaker"]
+        voice = OPENAI_VOICE_MAP.get(speaker, OPENAI_VOICE_MAP["Alex"])
+        if speaker not in OPENAI_VOICE_MAP:
+            logger.warning("Unknown speaker '%s' — falling back to Alex's voice.", speaker)
+
+        output_path = temp_dir / f"turn_{idx:04d}_{speaker.lower()}.mp3"
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice=voice,
+            input=turn["text"],
+        )
+        response.stream_to_file(str(output_path))
+        output_paths.append(output_path)
+
     return output_paths
 
 

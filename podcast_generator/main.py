@@ -10,7 +10,6 @@ import argparse
 import json
 import logging
 import shutil
-import sys
 import time
 from pathlib import Path
 
@@ -68,7 +67,10 @@ def _get_settings_interactive():
     if not output:
         output = "output_podcast.mp4"
 
-    return topic, level, words, output
+    tts_input = input("  🔊 TTS engine — 1: edge-tts (free)  2: OpenAI TTS [1]: ").strip()
+    tts_type = 2 if tts_input == "2" else 1
+
+    return topic, level, words, output, tts_type
 
 
 def step1_generate_script(topic: str, level: str, words: int) -> dict:
@@ -91,13 +93,14 @@ def step1_generate_script(topic: str, level: str, words: int) -> dict:
     return script
 
 
-def step2_synthesize_speech() -> list[Path]:
+def step2_synthesize_speech(tts_type: int = 1) -> list[Path]:
     """Synthesize TTS audio. Reads temp/script.json, saves temp/audio_paths.json."""
-    logger.info("━━━ STEP 2/5: Synthesizing speech with XTTS v2 ━━━")
+    engine_name = "OpenAI TTS" if tts_type == 2 else "edge-tts"
+    logger.info("━━━ STEP 2/5: Synthesizing speech with %s ━━━", engine_name)
     from tts_engine import synthesize_turns
 
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
-    audio_paths = synthesize_turns(script["turns"], VOICES_DIR, TEMP_DIR)
+    audio_paths = synthesize_turns(script["turns"], VOICES_DIR, TEMP_DIR, tts_type=tts_type)
 
     (TEMP_DIR / "audio_paths.json").write_text(
         json.dumps([str(p) for p in audio_paths], indent=2), encoding="utf-8"
@@ -178,16 +181,18 @@ def main():
     parser.add_argument("--level", default=None, help="CEFR English level (default: B1)")
     parser.add_argument("--words", type=int, default=None, help="Approximate word count (default: 2000)")
     parser.add_argument("--output", default=None, help="Output video filename (default: output_podcast.mp4)")
+    parser.add_argument("--tts", type=int, choices=[1, 2], default=1, help="TTS engine: 1=edge-tts (default), 2=OpenAI TTS")
 
     args = parser.parse_args()
 
     if args.topic is None:
-        topic, level, words, output = _get_settings_interactive()
+        topic, level, words, output, tts_type = _get_settings_interactive()
     else:
         topic = args.topic
         level = args.level or "B1"
         words = args.words or 2000
         output = args.output or "output_podcast.mp4"
+        tts_type = args.tts
 
     t_start = time.time()
 
@@ -203,7 +208,7 @@ def main():
     print()
 
     step1_generate_script(topic, level, words)
-    step2_synthesize_speech()
+    step2_synthesize_speech(tts_type=tts_type)
     step3_mix_audio()
     step4_generate_background()
     output_path = step5_build_video(output)
