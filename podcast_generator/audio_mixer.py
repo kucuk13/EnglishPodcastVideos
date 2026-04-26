@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def concatenate_audio(
     wav_paths: list[Path],
     output_path: str | Path,
-    gap_ms: int = 400,
+    gap_ms: int = 200,
 ) -> Path:
     """Concatenate wav files into a single audio file.
 

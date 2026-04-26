@@ -199,7 +199,7 @@ def build_video(
     audio_paths: list[Path],
     combined_audio_path: str | Path,
     output_path: str | Path,
-    gap_ms: int = 400,
+    gap_ms: int = 200,
     background_image_path: "Path | None" = None,
 ) -> Path:
     from audio_mixer import get_segment_durations
