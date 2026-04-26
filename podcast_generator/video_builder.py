@@ -160,30 +160,29 @@ def _build_turn_clip(
         .with_position((dot_x, dot_y))
     )
 
+    TEXT_START_X = dot_x + circle_size + 10  # 44 + 72 + 10 = 126
+
     # --- Speaker name (next to dot, top aligned so text center ≈ HEADER_CENTER_Y) ---
     speaker_label = TextClip(
         text=speaker,
         font_size=LABEL_FONT_SIZE,
         color=f"rgb({color[0]},{color[1]},{color[2]})",
         font=FONT_BOLD,
-        size=(400, None),
-        method="caption",
-    ).with_duration(total_duration).with_position((dot_x + circle_size - 150, HEADER_CENTER_Y - LABEL_FONT_SIZE // 2))
+        method="label",
+    ).with_duration(total_duration).with_position((TEXT_START_X, HEADER_CENTER_Y - LABEL_FONT_SIZE // 2))
 
     # --- Subtitle text ---
-    SUBTITLE_MARGIN = 60
-    subtitle_pixel_width = WIDTH - SUBTITLE_MARGIN * 2
-    wrapped_text = "\n".join(textwrap.wrap(text, width=subtitle_pixel_width // 20, break_long_words=False, break_on_hyphens=False))
+    SUBTITLE_LEFT = 20
+    RIGHT_MARGIN = 20
+    subtitle_wrap_chars = (WIDTH - SUBTITLE_LEFT - RIGHT_MARGIN) // 17
+    wrapped_text = "\n".join(textwrap.wrap(text, width=subtitle_wrap_chars, break_long_words=False, break_on_hyphens=False))
     subtitle_text = TextClip(
         text=wrapped_text,
         font_size=32,
         color=f"rgb({SUBTITLE_TEXT_COLOR[0]},{SUBTITLE_TEXT_COLOR[1]},{SUBTITLE_TEXT_COLOR[2]})",
         font=FONT_REGULAR,
-        size=(WIDTH - SUBTITLE_MARGIN * 2, 130),
-        method="caption",
-        text_align="left",
-        vertical_align="top",
-    ).with_duration(total_duration).with_position((SUBTITLE_MARGIN - 10, bar_y + 82))
+        method="label",
+    ).with_duration(total_duration).with_position((TEXT_START_X, bar_y + 90))
 
     layers = [*base_layers, bar_bg, speaker_label, subtitle_text]
     try:
