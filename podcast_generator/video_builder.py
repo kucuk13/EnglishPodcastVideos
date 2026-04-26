@@ -171,18 +171,29 @@ def _build_turn_clip(
         method="label",
     ).with_duration(total_duration).with_position((TEXT_START_X, HEADER_CENTER_Y - LABEL_FONT_SIZE // 2))
 
-    # --- Subtitle text ---
-    SUBTITLE_LEFT = 20
+    # --- Subtitle text (auto-shrink to fit available bar area) ---
     RIGHT_MARGIN = 20
-    subtitle_wrap_chars = (WIDTH - SUBTITLE_LEFT - RIGHT_MARGIN) // 17
-    wrapped_text = "\n".join(textwrap.wrap(text, width=subtitle_wrap_chars, break_long_words=False, break_on_hyphens=False))
-    subtitle_text = TextClip(
-        text=wrapped_text,
-        font_size=32,
-        color=f"rgb({SUBTITLE_TEXT_COLOR[0]},{SUBTITLE_TEXT_COLOR[1]},{SUBTITLE_TEXT_COLOR[2]})",
-        font=FONT_REGULAR,
-        method="label",
-    ).with_duration(total_duration).with_position((TEXT_START_X, bar_y + 90))
+    SUBTITLE_AVAILABLE_WIDTH = WIDTH - TEXT_START_X - RIGHT_MARGIN
+    SUBTITLE_AVAILABLE_HEIGHT = BAR_HEIGHT - 90 - 10  # bar height minus header area minus bottom padding
+    MAX_SUBTITLE_FONT = 32
+    MIN_SUBTITLE_FONT = 14
+    subtitle_color = f"rgb({SUBTITLE_TEXT_COLOR[0]},{SUBTITLE_TEXT_COLOR[1]},{SUBTITLE_TEXT_COLOR[2]})"
+
+    subtitle_text = None
+    for font_size in range(MAX_SUBTITLE_FONT, MIN_SUBTITLE_FONT - 1, -2):
+        chars_per_line = max(20, int(SUBTITLE_AVAILABLE_WIDTH / (font_size * 17 / 32)))
+        wrapped = "\n".join(textwrap.wrap(text, width=chars_per_line, break_long_words=False, break_on_hyphens=False))
+        candidate = TextClip(
+            text=wrapped,
+            font_size=font_size,
+            color=subtitle_color,
+            font=FONT_REGULAR,
+            method="label",
+        )
+        if candidate.size[1] <= SUBTITLE_AVAILABLE_HEIGHT or font_size == MIN_SUBTITLE_FONT:
+            subtitle_text = candidate.with_duration(total_duration).with_position((TEXT_START_X, bar_y + 90))
+            break
+        candidate.close()
 
     layers = [*base_layers, bar_bg, speaker_label, subtitle_text]
     try:
