@@ -6,9 +6,11 @@ Supports two backends:
   2 — OpenAI TTS API (requires OPENAI_API_KEY)
 """
 
+import time
 import asyncio
 import logging
 from pathlib import Path
+from openai import RateLimitError, APIError, APIConnectionError
 
 from tqdm import tqdm
 
@@ -84,7 +86,7 @@ def _synthesize_all_openai(turns: list[dict], temp_dir: Path) -> list[Path]:
 
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set — cannot use OpenAI TTS (type 2).")
+        raise RuntimeError("OPENAI_API_KEY is not set — cannot use OpenAI TTS.")
 
     client = openai.OpenAI(api_key=api_key)
     output_paths: list[Path] = []
@@ -92,17 +94,47 @@ def _synthesize_all_openai(turns: list[dict], temp_dir: Path) -> list[Path]:
     for idx, turn in enumerate(tqdm(turns, desc="OpenAI TTS", unit="turn")):
         speaker = turn["speaker"]
         voice = OPENAI_VOICE_MAP.get(speaker, OPENAI_VOICE_MAP["Jack"])
-        if speaker not in OPENAI_VOICE_MAP:
-            logger.warning("Unknown speaker '%s' — falling back to Jack's voice.", speaker)
-
         output_path = temp_dir / f"turn_{idx:04d}_{speaker.lower()}.mp3"
-        response = client.audio.speech.create(
-            model="tts-1",
-            voice=voice,
-            input=turn["text"],
-        )
-        response.stream_to_file(str(output_path))
-        output_paths.append(output_path)
+
+        # Önceden üretilmişse tekrar API harcama
+        if output_path.exists() and output_path.stat().st_size > 0:
+            output_paths.append(output_path)
+            continue
+
+        max_retries = 8
+        delay = 3
+
+        for attempt in range(max_retries):
+            try:
+                response = client.audio.speech.create(
+                    model="tts-1",
+                    voice=voice,
+                    input=turn["text"],
+                )
+                response.stream_to_file(str(output_path))
+                output_paths.append(output_path)
+
+                # burst yememek için küçük pacing
+                time.sleep(1.5)
+                break
+
+            except RateLimitError:
+                wait = delay * (2 ** attempt)
+                logger.warning(
+                    "Rate limit at turn %d. Waiting %ds before retry...",
+                    idx, wait
+                )
+                time.sleep(wait)
+
+            except (APIError, APIConnectionError) as e:
+                wait = delay * (2 ** attempt)
+                logger.warning(
+                    "OpenAI API error at turn %d: %s. Retrying in %ds...",
+                    idx, e, wait
+                )
+                time.sleep(wait)
+        else:
+            raise RuntimeError(f"Failed to synthesize turn {idx} after retries.")
 
     return output_paths
 
