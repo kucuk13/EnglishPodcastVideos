@@ -74,7 +74,21 @@ def _get_settings_interactive():
     tts_input = input("  🔊 TTS engine — 1: edge-tts (free)  2: OpenAI TTS [2]: ").strip()
     tts_type = 1 if tts_input == "1" else 2
 
-    return topic, level, words, output, tts_type, llm_type
+    mode_input = input("  ⚙  Mode         — 1: Auto (no prompts)  2: Step-by-step [1]: ").strip()
+    mode = 2 if mode_input == "2" else 1
+
+    return topic, level, words, output, tts_type, llm_type, mode
+
+
+def _run_step(step_fn, *args, mode: int = 1, **kwargs):
+    while True:
+        result = step_fn(*args, **kwargs)
+        if mode == 1:
+            return result
+        answer = input("  ➡  Devam edilsin mi? (y/n) [y]: ").strip().lower()
+        if answer != "n":
+            return result
+        print("  🔄  Adım tekrar yapılıyor...")
 
 
 def step1_generate_script(topic: str, level: str, words: int, llm_type: int) -> dict:
@@ -332,11 +346,12 @@ def main():
     parser.add_argument("--output", default=None, help="Output video filename (default: output_podcast.mp4)")
     parser.add_argument("--llm", type=int, choices=[1, 2], default=1, help="LLM engine: 1=Claude (default), 2=OpenAI")
     parser.add_argument("--tts", type=int, choices=[1, 2], default=2, help="TTS engine: 1=edge-tts, 2=OpenAI TTS (default)")
+    parser.add_argument("--mode", type=int, choices=[1, 2], default=1, help="Run mode: 1=auto (default), 2=step-by-step")
 
     args = parser.parse_args()
 
     if args.topic is None:
-        topic, level, words, output, tts_type, llm_type = _get_settings_interactive()
+        topic, level, words, output, tts_type, llm_type, mode = _get_settings_interactive()
     else:
         topic = args.topic
         level = args.level or "A2"
@@ -344,6 +359,7 @@ def main():
         output = args.output or "output_podcast.mp4"
         llm_type = args.llm
         tts_type = args.tts
+        mode = args.mode
 
     t_start = time.time()
 
@@ -360,14 +376,14 @@ def main():
     print("═" * 60)
     print()
 
-    step1_generate_script(topic, level, words, llm_type)
-    step2_generate_youtube_description()
-    step3_generate_youtube_keywords()
-    step4_synthesize_speech(tts_type=tts_type)
-    step5_mix_audio()
-    step6_generate_background()
-    step7_generate_thumbnail(level)
-    output_path = step8_build_video(output)
+    _run_step(step1_generate_script, topic, level, words, llm_type, mode=mode)
+    _run_step(step2_generate_youtube_description, mode=mode)
+    _run_step(step3_generate_youtube_keywords, mode=mode)
+    _run_step(step4_synthesize_speech, tts_type=tts_type, mode=mode)
+    _run_step(step5_mix_audio, mode=mode)
+    _run_step(step6_generate_background, mode=mode)
+    _run_step(step7_generate_thumbnail, level, mode=mode)
+    output_path = _run_step(step8_build_video, output, mode=mode)
 
     elapsed = time.time() - t_start
     print()
