@@ -9,7 +9,6 @@ Usage:
 import argparse
 import json
 import logging
-import re
 import shutil
 import time
 from pathlib import Path
@@ -111,81 +110,35 @@ def step1_generate_script(topic: str, level: str, words: int, llm_type: int) -> 
     return script
 
 
-def step2_generate_youtube_description() -> str:
-    """Generate a short YouTube video description from temp/script.json."""
+def step2_generate_youtube_description(llm_type: int = 1) -> str:
+    """Generate a short YouTube video description via LLM from the full script."""
     logger.info("━━━ STEP 2/8: Generating YouTube video description ━━━")
+    from script_generator import generate_youtube_description
+
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
+    description = generate_youtube_description(script, llm_type)
 
-    turns_text = " ".join(turn["text"].strip() for turn in script["turns"][:3])
-    turns_text = " ".join(turns_text.split())
-    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', turns_text) if s.strip()]
-    if sentences:
-        description = " ".join(sentences[:2])
-    else:
-        description = script.get("title", "")
-
-    if not description:
-        description = f"A short English learning podcast about {script.get('topic', 'everyday conversation')}."
-
-    description = description.strip()
     if len(description) > 250:
         description = description[:247].rstrip(" .,!?;") + "..."
 
     description_path = TEMP_DIR / "youtube_description.txt"
     description_path.write_text(description, encoding="utf-8")
-    logger.info("YouTube description saved: %s", description_path)
+    logger.info("YouTube description: %s", description)
+    logger.info("Saved: %s", description_path)
     return description
 
 
-def step3_generate_youtube_keywords() -> str:
-    """Generate SEO-friendly YouTube keywords from temp/script.json."""
+def step3_generate_youtube_keywords(llm_type: int = 1) -> str:
+    """Generate SEO-friendly YouTube keywords via LLM from the full script."""
     logger.info("━━━ STEP 3/8: Generating SEO-friendly YouTube keywords ━━━")
+    from script_generator import generate_youtube_keywords
+
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
+    keywords_text = generate_youtube_keywords(script, llm_type)
 
-    title = script.get("title", "")
-    topic = script.get("topic", "")
-    source_text = " ".join(
-        [title, topic] + [turn["text"] for turn in script["turns"][:4]]
-    ).strip().lower()
-
-    words = re.findall(r"\b[a-zA-Z]{3,}\b", source_text)
-    stopwords = {
-        "the", "and", "for", "with", "about", "your", "that", "this",
-        "from", "have", "will", "just", "more", "what", "when", "where",
-        "they", "them", "their", "than", "then", "into", "also", "such",
-        "here", "very", "also", "been", "many", "which", "those", "these",
-        "english", "podcast", "learning", "conversation", "learn"
-    }
-    freq: dict[str, int] = {}
-    for word in words:
-        if word not in stopwords:
-            freq[word] = freq.get(word, 0) + 1
-
-    sorted_keywords = sorted(freq, key=lambda k: (-freq[k], k))
-
-    keywords: list[str] = []
-    used: set[str] = set()
-    for phrase in [title, topic, "English podcast", "English conversation", "Learn English"]:
-        if phrase:
-            clean_phrase = phrase.strip()
-            key = clean_phrase.lower()
-            if key and key not in used:
-                keywords.append(clean_phrase)
-                used.add(key)
-
-    for word in sorted_keywords:
-        if len(keywords) >= 12:
-            break
-        if word not in used:
-            keywords.append(word)
-            used.add(word)
-
-    if not keywords:
-        keywords = ["English podcast", "English conversation", "Learn English"]
-
-    keywords_text = ", ".join(keywords[:12])
     (TEMP_DIR / "youtube_keywords.txt").write_text(keywords_text, encoding="utf-8")
-    logger.info("YouTube keywords saved: %s", TEMP_DIR / "youtube_keywords.txt")
+    logger.info("YouTube keywords: %s", keywords_text)
+    logger.info("Saved: %s", TEMP_DIR / "youtube_keywords.txt")
     return keywords_text
 
 
@@ -238,8 +191,8 @@ def step6_generate_background() -> Path | None:
         return None
 
 
-def step7_generate_thumbnail(level: str) -> Path | None:
-    """Generate a click-worthy thumbnail using the generated background image."""
+def step7_generate_thumbnail(level: str, llm_type: int = 1) -> Path | None:
+    """Generate a click-worthy thumbnail over the step6 background image."""
     logger.info("━━━ STEP 7/8: Generating clickable thumbnail ━━━")
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
     bg_path = TEMP_DIR / "background.png"
@@ -250,6 +203,7 @@ def step7_generate_thumbnail(level: str) -> Path | None:
         return None
 
     from PIL import Image, ImageDraw, ImageFont
+    from script_generator import generate_thumbnail_headline
 
     try:
         image = Image.open(bg_path).convert("RGB")
@@ -257,48 +211,75 @@ def step7_generate_thumbnail(level: str) -> Path | None:
         logger.warning("Thumbnail creation failed: %s", exc)
         return None
 
-    headline_source = " ".join([script.get("title", ""), script.get("topic", "")]).strip()
-    tokens = [t for t in re.findall(r"\b[a-zA-Z']{3,}\b", headline_source) if len(t) > 1]
-    common_stopwords = {
-        "the", "and", "for", "with", "about", "your", "that", "this",
-        "from", "have", "will", "just", "more", "what", "when", "where",
-        "they", "them", "their", "than", "then", "into", "also", "such",
-        "here", "very", "been", "many", "which", "those", "these",
-        "english", "podcast", "learning", "conversation", "learn"
-    }
-    headline_words = [w.title() for w in tokens if w.lower() not in common_stopwords]
-    if not headline_words:
-        headline_words = [w.title() for w in tokens][:5]
-    headline = " ".join(headline_words[:5]) or "English Podcast"
-
-    width, height = image.size
-    overlay_height = 200
-    overlay = Image.new("RGBA", (width, overlay_height), (0, 0, 0, 180))
-    image.paste(overlay, (0, height - overlay_height), overlay)
-
-    font_path = None
-    for name in ["arialbd.ttf", "arial.ttf"]:
-        try:
-            font_path = Path("C:/Windows/Fonts") / name
-            if font_path.exists():
-                font_path = str(font_path)
-                break
-        except Exception:
-            font_path = None
+    # LLM-generated click-worthy headline, max 5 words, all caps
     try:
-        title_font = ImageFont.truetype(font_path or "arial", 64)
-        level_font = ImageFont.truetype(font_path or "arial", 36)
+        headline = generate_thumbnail_headline(script, llm_type)
+        headline_words = headline.split()
+        if len(headline_words) > 5:
+            headline = " ".join(headline_words[:5])
+        headline = headline.upper().strip('"\'"')
+    except Exception:
+        headline = " ".join(script.get("title", "English Podcast").upper().split()[:5])
+
+    width, height = image.size  # 1280x720
+
+    # Dark gradient overlay on bottom half (keeps background visible on top)
+    gradient = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw_grad = ImageDraw.Draw(gradient)
+    for y in range(height // 2, height):
+        alpha = int(220 * (y - height // 2) / max(height // 2 - 1, 1))
+        draw_grad.line([(0, y), (width - 1, y)], fill=(0, 0, 0, alpha))
+    image = Image.alpha_composite(image.convert("RGBA"), gradient).convert("RGB")
+
+    # Find the boldest available font
+    font_path = None
+    for name in ["impact.ttf", "arialbd.ttf", "arial.ttf"]:
+        candidate = Path("C:/Windows/Fonts") / name
+        if candidate.exists():
+            font_path = str(candidate)
+            break
+
+    try:
+        title_font = ImageFont.truetype(font_path or "arial", 90)
+        level_font = ImageFont.truetype(font_path or "arial", 42)
     except Exception:
         title_font = ImageFont.load_default()
         level_font = ImageFont.load_default()
 
     draw = ImageDraw.Draw(image)
-    text_x = 40
-    text_y = height - overlay_height + 30
+
+    # Headline with thick outline for contrast
+    text_x = 50
+    text_y = height - 190
+    for dx, dy in [(-4, -4), (-4, 4), (4, -4), (4, 4), (-4, 0), (4, 0), (0, -4), (0, 4)]:
+        draw.text((text_x + dx, text_y + dy), headline, font=title_font, fill=(0, 0, 0))
     draw.text((text_x, text_y), headline, font=title_font, fill=(255, 255, 255))
-    level_text = f"Level {level}"
-    level_y = text_y + 80
-    draw.text((text_x, level_y), level_text, font=level_font, fill=(255, 215, 0))
+
+    # Level badge — top-right corner, color-coded by CEFR level
+    level_colors = {
+        "A1": (76, 175, 80),
+        "A2": (139, 195, 74),
+        "B1": (255, 193, 7),
+        "B2": (255, 152, 0),
+        "C1": (244, 67, 54),
+        "C2": (156, 39, 176),
+    }
+    badge_color = level_colors.get(level.upper(), (255, 193, 7))
+    badge_text = f"LEVEL {level.upper()}"
+    padding = 18
+    try:
+        bbox = draw.textbbox((0, 0), badge_text, font=level_font)
+        bw = bbox[2] - bbox[0] + padding * 2
+        bh = bbox[3] - bbox[1] + padding * 2
+    except AttributeError:
+        bw, bh = 160, 60  # fallback for old Pillow
+    bx = width - bw - 30
+    by = 30
+    try:
+        draw.rounded_rectangle([bx, by, bx + bw, by + bh], radius=14, fill=badge_color)
+    except AttributeError:
+        draw.rectangle([bx, by, bx + bw, by + bh], fill=badge_color)
+    draw.text((bx + padding, by + padding), badge_text, font=level_font, fill=(255, 255, 255))
 
     image.save(thumbnail_path, format="PNG")
     logger.info("Thumbnail saved: %s", thumbnail_path)
@@ -377,12 +358,12 @@ def main():
     print()
 
     _run_step(step1_generate_script, topic, level, words, llm_type, mode=mode)
-    _run_step(step2_generate_youtube_description, mode=mode)
-    _run_step(step3_generate_youtube_keywords, mode=mode)
+    _run_step(step2_generate_youtube_description, llm_type, mode=mode)
+    _run_step(step3_generate_youtube_keywords, llm_type, mode=mode)
     _run_step(step4_synthesize_speech, tts_type=tts_type, mode=mode)
     _run_step(step5_mix_audio, mode=mode)
     _run_step(step6_generate_background, mode=mode)
-    _run_step(step7_generate_thumbnail, level, mode=mode)
+    _run_step(step7_generate_thumbnail, level, llm_type, mode=mode)
     output_path = _run_step(step8_build_video, output, mode=mode)
 
     elapsed = time.time() - t_start

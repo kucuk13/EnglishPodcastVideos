@@ -137,6 +137,87 @@ def _generate_via_openai(user_prompt: str, max_retries: int) -> dict:
     raise ValueError(f"Failed to get valid JSON from OpenAI after {max_retries} attempts.")
 
 
+def _call_claude_text(system: str, user_prompt: str) -> str:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY environment variable is not set.")
+    client = anthropic.Anthropic(api_key=api_key)
+    message = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=512,
+        system=system,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    return message.content[0].text.strip()
+
+
+def _call_openai_text(system: str, user_prompt: str) -> str:
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise RuntimeError("openai package is not installed. Run: pip install openai") from exc
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY environment variable is not set.")
+    from openai import OpenAI as _OpenAI
+    client = _OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        max_tokens=512,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    return response.choices[0].message.content.strip()
+
+
+def _llm_text(system: str, user_prompt: str, llm_type: int) -> str:
+    if llm_type == 2:
+        return _call_openai_text(system, user_prompt)
+    return _call_claude_text(system, user_prompt)
+
+
+def generate_youtube_description(script: dict, llm_type: int = 1) -> str:
+    """Generate a 1-2 sentence YouTube description from the full script via LLM."""
+    full_text = " ".join(t["text"] for t in script["turns"])
+    system = "You are a YouTube SEO expert. Write concise, engaging video descriptions."
+    user_prompt = (
+        f"Podcast title: \"{script.get('title', '')}\"\n\n"
+        f"Transcript:\n{full_text[:4000]}\n\n"
+        "Write a 1-2 sentence YouTube video description that is engaging and informative. "
+        "Return ONLY the description text, no labels or extra text."
+    )
+    return _llm_text(system, user_prompt, llm_type)
+
+
+def generate_youtube_keywords(script: dict, llm_type: int = 1) -> str:
+    """Generate SEO-friendly comma-separated YouTube keywords via LLM."""
+    full_text = " ".join(t["text"] for t in script["turns"])
+    system = "You are a YouTube SEO expert. Generate relevant, searchable keywords."
+    user_prompt = (
+        f"Podcast title: \"{script.get('title', '')}\"\n"
+        f"Topic: \"{script.get('topic', '')}\"\n\n"
+        f"Transcript:\n{full_text[:4000]}\n\n"
+        "Generate 10-15 SEO-friendly YouTube keywords/tags for this English learning podcast. "
+        "Return ONLY a comma-separated list, no labels or extra text."
+    )
+    return _llm_text(system, user_prompt, llm_type)
+
+
+def generate_thumbnail_headline(script: dict, llm_type: int = 1) -> str:
+    """Generate a catchy max-5-word thumbnail headline via LLM."""
+    system = "You are a YouTube thumbnail copywriter. Write punchy, click-worthy headlines."
+    user_prompt = (
+        f"Podcast title: \"{script.get('title', '')}\"\n"
+        f"Topic: \"{script.get('topic', '')}\"\n\n"
+        "Write a catchy YouTube thumbnail headline in MAXIMUM 5 WORDS. "
+        "Make it intriguing and click-worthy for English learners. "
+        "Return ONLY the headline text, no quotes or extra text."
+    )
+    return _llm_text(system, user_prompt, llm_type)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     script = generate_script("Meeting People", "A2", 2000)
