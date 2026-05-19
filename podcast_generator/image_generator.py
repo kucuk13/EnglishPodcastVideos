@@ -43,7 +43,6 @@ def generate_background_image(title: str, topic: str, output_path: Path) -> Path
     prompt = (
         f"Two friendly characters (a man and a woman) having a simple everyday conversation about {topic}."
         "Scene includes a clear background related to the topic (cafe, airport, park, shop, etc)."
-        "Simple educational ESL comic illustration style."
         "No speech bubbles."
         "Cartoon style, 16:9 aspect ratio."
     )
