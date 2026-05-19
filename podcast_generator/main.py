@@ -60,8 +60,8 @@ def _get_settings_interactive():
     if not level:
         level = "A2"
 
-    words_input = input("  📝 Approximate word count [3000]: ").strip()
-    words = int(words_input) if words_input.isdigit() else 3000
+    words_input = input("  📝 Approximate word count [2000]: ").strip()
+    words = int(words_input) if words_input.isdigit() else 2000
 
     output = input("  💾 Output filename [output_podcast.mp4]: ").strip()
     if not output:
@@ -176,16 +176,16 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Example:\n"
-            '  python main.py --topic "Meeting New People" --level A2 --words 3000\n'
+            '  python main.py --topic "Meeting New People" --level A2 --words 2000\n'
             "  python main.py          (interactive mode)\n"
         ),
     )
     parser.add_argument("--topic", default=None, help="Podcast topic")
     parser.add_argument("--level", default=None, help="CEFR English level (default: A2)")
-    parser.add_argument("--words", type=int, default=None, help="Approximate word count (default: 3000)")
+    parser.add_argument("--words", type=int, default=None, help="Approximate word count (default: 2000)")
     parser.add_argument("--output", default=None, help="Output video filename (default: output_podcast.mp4)")
-    parser.add_argument("--tts", type=int, choices=[1, 2], default=1, help="TTS engine: 1=edge-tts (default), 2=OpenAI TTS")
     parser.add_argument("--llm", type=int, choices=[1, 2], default=1, help="LLM engine: 1=Claude (default), 2=OpenAI")
+    parser.add_argument("--tts", type=int, choices=[1, 2], default=2, help="TTS engine: 1=edge-tts, 2=OpenAI TTS (default)")
 
     args = parser.parse_args()
 
@@ -194,10 +194,10 @@ def main():
     else:
         topic = args.topic
         level = args.level or "A2"
-        words = args.words or 3000
+        words = args.words or 2000
         output = args.output or "output_podcast.mp4"
-        tts_type = args.tts
         llm_type = args.llm
+        tts_type = args.tts
 
     t_start = time.time()
 
@@ -209,8 +209,8 @@ def main():
     print(f"  Level : {level}")
     print(f"  Words : ~{words}")
     print(f"  Output: {output}")
-    print(f"  TTS Type : {tts_type}")
     print(f"  LLLM Type: {llm_type}")
+    print(f"  TTS Type : {tts_type}")
     print("═" * 60)
     print()
 

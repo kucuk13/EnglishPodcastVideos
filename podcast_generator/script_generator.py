@@ -70,7 +70,7 @@ def _parse_and_validate(raw_text: str, attempt: int) -> dict | None:
 def generate_script(
     topic: str,
     level: str = "A2",
-    words: int = 3000,
+    words: int = 2000,
     llm_type: int = 1,
     max_retries: int = 2,
 ) -> dict:
@@ -149,5 +149,5 @@ def _generate_via_openai(user_prompt: str, max_retries: int) -> dict:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    script = generate_script("Meeting People", "A2", 3000)
+    script = generate_script("Meeting People", "A2", 2000)
     print(json.dumps(script, indent=2, ensure_ascii=False))

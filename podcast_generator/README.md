@@ -20,7 +20,7 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python main.py --topic "Meeting People" --level A2 --words 3000
+python main.py --topic "Meeting People" --level A2 --words 2000
 ```
 
 ### CLI Arguments
@@ -29,7 +29,7 @@ python main.py --topic "Meeting People" --level A2 --words 3000
 |-------------|----------------------|--------------------------------------|
 | `--topic`   | *(required)*         | Podcast topic                        |
 | `--level`   | `A2`                 | CEFR English level (A1–C2)          |
-| `--words`   | `3000`               | Approximate word count for dialogue  |
+| `--words`   | `2000`               | Approximate word count for dialogue  |
 | `--output`  | `output_podcast.mp4` | Output video filename                |
 
 ## Output
