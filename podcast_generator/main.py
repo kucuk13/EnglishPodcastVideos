@@ -70,7 +70,7 @@ def _get_settings_interactive():
     llm_input = input("  🤖 LLM engine  — 1: Claude         2: OpenAI       [1]: ").strip()
     llm_type = 2 if llm_input == "2" else 1
 
-    tts_input = input("  🔊 TTS engine — 1: edge-tts (free)  2: OpenAI TTS [1]: ").strip()
+    tts_input = input("  🔊 TTS engine — 1: edge-tts (free)  2: OpenAI TTS [2]: ").strip()
     tts_type = 2 if tts_input == "2" else 1
 
     return topic, level, words, output, tts_type, llm_type
