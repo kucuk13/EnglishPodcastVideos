@@ -9,6 +9,7 @@ Usage:
 import argparse
 import json
 import logging
+import re
 import shutil
 import time
 from pathlib import Path
@@ -78,7 +79,7 @@ def _get_settings_interactive():
 
 def step1_generate_script(topic: str, level: str, words: int, llm_type: int) -> dict:
     """Generate podcast script via Claude API. Saves to temp/script.json."""
-    logger.info("━━━ STEP 1/5: Generating podcast script via API ━━━")
+    logger.info("━━━ STEP 1/8: Generating podcast script via API ━━━")
     from script_generator import generate_script
 
     _clean_temp()
@@ -96,10 +97,88 @@ def step1_generate_script(topic: str, level: str, words: int, llm_type: int) -> 
     return script
 
 
-def step2_synthesize_speech(tts_type: int = 1) -> list[Path]:
+def step2_generate_youtube_description() -> str:
+    """Generate a short YouTube video description from temp/script.json."""
+    logger.info("━━━ STEP 2/8: Generating YouTube video description ━━━")
+    script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
+
+    turns_text = " ".join(turn["text"].strip() for turn in script["turns"][:3])
+    turns_text = " ".join(turns_text.split())
+    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', turns_text) if s.strip()]
+    if sentences:
+        description = " ".join(sentences[:2])
+    else:
+        description = script.get("title", "")
+
+    if not description:
+        description = f"A short English learning podcast about {script.get('topic', 'everyday conversation')}."
+
+    description = description.strip()
+    if len(description) > 250:
+        description = description[:247].rstrip(" .,!?;") + "..."
+
+    description_path = TEMP_DIR / "youtube_description.txt"
+    description_path.write_text(description, encoding="utf-8")
+    logger.info("YouTube description saved: %s", description_path)
+    return description
+
+
+def step3_generate_youtube_keywords() -> str:
+    """Generate SEO-friendly YouTube keywords from temp/script.json."""
+    logger.info("━━━ STEP 3/8: Generating SEO-friendly YouTube keywords ━━━")
+    script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
+
+    title = script.get("title", "")
+    topic = script.get("topic", "")
+    source_text = " ".join(
+        [title, topic] + [turn["text"] for turn in script["turns"][:4]]
+    ).strip().lower()
+
+    words = re.findall(r"\b[a-zA-Z]{3,}\b", source_text)
+    stopwords = {
+        "the", "and", "for", "with", "about", "your", "that", "this",
+        "from", "have", "will", "just", "more", "what", "when", "where",
+        "they", "them", "their", "than", "then", "into", "also", "such",
+        "here", "very", "also", "been", "many", "which", "those", "these",
+        "english", "podcast", "learning", "conversation", "learn"
+    }
+    freq: dict[str, int] = {}
+    for word in words:
+        if word not in stopwords:
+            freq[word] = freq.get(word, 0) + 1
+
+    sorted_keywords = sorted(freq, key=lambda k: (-freq[k], k))
+
+    keywords: list[str] = []
+    used: set[str] = set()
+    for phrase in [title, topic, "English podcast", "English conversation", "Learn English"]:
+        if phrase:
+            clean_phrase = phrase.strip()
+            key = clean_phrase.lower()
+            if key and key not in used:
+                keywords.append(clean_phrase)
+                used.add(key)
+
+    for word in sorted_keywords:
+        if len(keywords) >= 12:
+            break
+        if word not in used:
+            keywords.append(word)
+            used.add(word)
+
+    if not keywords:
+        keywords = ["English podcast", "English conversation", "Learn English"]
+
+    keywords_text = ", ".join(keywords[:12])
+    (TEMP_DIR / "youtube_keywords.txt").write_text(keywords_text, encoding="utf-8")
+    logger.info("YouTube keywords saved: %s", TEMP_DIR / "youtube_keywords.txt")
+    return keywords_text
+
+
+def step4_synthesize_speech(tts_type: int = 1) -> list[Path]:
     """Synthesize TTS audio. Reads temp/script.json, saves temp/audio_paths.json."""
     engine_name = "OpenAI TTS" if tts_type == 2 else "edge-tts"
-    logger.info("━━━ STEP 2/5: Synthesizing speech with %s ━━━", engine_name)
+    logger.info("━━━ STEP 4/8: Synthesizing speech with %s ━━━", engine_name)
     from tts_engine import synthesize_turns
 
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
@@ -112,9 +191,9 @@ def step2_synthesize_speech(tts_type: int = 1) -> list[Path]:
     return audio_paths
 
 
-def step3_mix_audio() -> Path:
+def step5_mix_audio() -> Path:
     """Concatenate per-turn audio. Reads temp/audio_paths.json, writes temp/combined.wav."""
-    logger.info("━━━ STEP 3/5: Mixing audio ━━━")
+    logger.info("━━━ STEP 5/8: Mixing audio ━━━")
     from audio_mixer import concatenate_audio
 
     audio_paths = [
@@ -126,12 +205,12 @@ def step3_mix_audio() -> Path:
     return combined_audio
 
 
-def step4_generate_background() -> Path | None:
+def step6_generate_background() -> Path | None:
     """Generate AI background image via OpenAI GPT-IMAGE-1. Saves to temp/background.png.
 
     Returns the image path, or None if OPENAI_API_KEY is not set (graceful fallback).
     """
-    logger.info("━━━ STEP 4/5: Generating background image via GPT-IMAGE-1 ━━━")
+    logger.info("━━━ STEP 6/8: Generating background image via GPT-IMAGE-1 ━━━")
     from image_generator import generate_background_image
 
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
@@ -145,9 +224,76 @@ def step4_generate_background() -> Path | None:
         return None
 
 
-def step5_build_video(output: str | Path) -> Path:
+def step7_generate_thumbnail(level: str) -> Path | None:
+    """Generate a click-worthy thumbnail using the generated background image."""
+    logger.info("━━━ STEP 7/8: Generating clickable thumbnail ━━━")
+    script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
+    bg_path = TEMP_DIR / "background.png"
+    thumbnail_path = TEMP_DIR / "thumbnail.png"
+
+    if not bg_path.exists():
+        logger.warning("Thumbnail skipped: background image not available.")
+        return None
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    try:
+        image = Image.open(bg_path).convert("RGB")
+    except Exception as exc:
+        logger.warning("Thumbnail creation failed: %s", exc)
+        return None
+
+    headline_source = " ".join([script.get("title", ""), script.get("topic", "")]).strip()
+    tokens = [t for t in re.findall(r"\b[a-zA-Z']{3,}\b", headline_source) if len(t) > 1]
+    common_stopwords = {
+        "the", "and", "for", "with", "about", "your", "that", "this",
+        "from", "have", "will", "just", "more", "what", "when", "where",
+        "they", "them", "their", "than", "then", "into", "also", "such",
+        "here", "very", "been", "many", "which", "those", "these",
+        "english", "podcast", "learning", "conversation", "learn"
+    }
+    headline_words = [w.title() for w in tokens if w.lower() not in common_stopwords]
+    if not headline_words:
+        headline_words = [w.title() for w in tokens][:5]
+    headline = " ".join(headline_words[:5]) or "English Podcast"
+
+    width, height = image.size
+    overlay_height = 200
+    overlay = Image.new("RGBA", (width, overlay_height), (0, 0, 0, 180))
+    image.paste(overlay, (0, height - overlay_height), overlay)
+
+    font_path = None
+    for name in ["arialbd.ttf", "arial.ttf"]:
+        try:
+            font_path = Path("C:/Windows/Fonts") / name
+            if font_path.exists():
+                font_path = str(font_path)
+                break
+        except Exception:
+            font_path = None
+    try:
+        title_font = ImageFont.truetype(font_path or "arial", 64)
+        level_font = ImageFont.truetype(font_path or "arial", 36)
+    except Exception:
+        title_font = ImageFont.load_default()
+        level_font = ImageFont.load_default()
+
+    draw = ImageDraw.Draw(image)
+    text_x = 40
+    text_y = height - overlay_height + 30
+    draw.text((text_x, text_y), headline, font=title_font, fill=(255, 255, 255))
+    level_text = f"Level {level}"
+    level_y = text_y + 80
+    draw.text((text_x, level_y), level_text, font=level_font, fill=(255, 215, 0))
+
+    image.save(thumbnail_path, format="PNG")
+    logger.info("Thumbnail saved: %s", thumbnail_path)
+    return thumbnail_path
+
+
+def step8_build_video(output: str | Path) -> Path:
     """Render the final video. Reads all inputs from temp/. Returns output path."""
-    logger.info("━━━ STEP 5/5: Building video ━━━")
+    logger.info("━━━ STEP 8/8: Building video ━━━")
     from video_builder import build_video
 
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
@@ -215,10 +361,13 @@ def main():
     print()
 
     step1_generate_script(topic, level, words, llm_type)
-    step2_synthesize_speech(tts_type=tts_type)
-    step3_mix_audio()
-    step4_generate_background()
-    output_path = step5_build_video(output)
+    step2_generate_youtube_description()
+    step3_generate_youtube_keywords()
+    step4_synthesize_speech(tts_type=tts_type)
+    step5_mix_audio()
+    step6_generate_background()
+    step7_generate_thumbnail(level)
+    output_path = step8_build_video(output)
 
     elapsed = time.time() - t_start
     print()
