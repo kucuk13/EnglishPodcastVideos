@@ -69,12 +69,12 @@ def synthesize_turns(
     temp_dir = Path(temp_dir)
     temp_dir.mkdir(parents=True, exist_ok=True)
 
-    if tts_type == 2:
-        logger.info("Synthesizing %d dialogue turns with OpenAI TTS…", len(turns))
-        output_paths = _synthesize_all_openai(turns, temp_dir)
-    else:
+    if tts_type == 1:
         logger.info("Synthesizing %d dialogue turns with edge-tts…", len(turns))
         output_paths = asyncio.run(_synthesize_all(turns, temp_dir))
+    else:
+        logger.info("Synthesizing %d dialogue turns with OpenAI TTS…", len(turns))
+        output_paths = _synthesize_all_openai(turns, temp_dir)
 
     logger.info("All %d turns synthesized successfully.", len(output_paths))
     return output_paths
