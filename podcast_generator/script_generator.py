@@ -1,7 +1,3 @@
-"""
-script_generator.py — Podcast dialogue generation via Claude or OpenAI.
-"""
-
 import json
 import logging
 import os
@@ -74,12 +70,6 @@ def generate_script(
     llm_type: int = 1,
     max_retries: int = 2,
 ) -> dict:
-    """Generate a podcast script via Claude (llm_type=1) or OpenAI (llm_type=2).
-
-    Returns a dict with keys "title" and "turns".
-    Raises RuntimeError if the required API key is missing.
-    Raises ValueError if valid JSON cannot be obtained after retries.
-    """
     user_prompt = (
         f"Write a podcast dialogue about the topic: \"{topic}\".\n"
         f"Target CEFR level: {level}.\n"
