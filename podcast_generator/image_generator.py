@@ -63,3 +63,91 @@ def generate_background_image(title: str, topic: str, output_path: Path) -> Path
 
     logger.info("Background image saved: %s", output_path)
     return output_path
+
+def generate_thumbnail_image(
+    title: str,
+    topic: str,
+    level: str,
+    background_path: Path,
+    output_path: Path,
+) -> Path:
+    """
+    Generate a clickable YouTube thumbnail using the existing background image.
+
+    Uses GPT-IMAGE-1 image editing to transform the background into
+    a high-CTR thumbnail.
+    """
+
+    import openai
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY environment variable is not set."
+        )
+
+    client = openai.OpenAI(api_key=api_key)
+
+    thumbnail_prompt = f"""
+Create a HIGH-CTR YouTube thumbnail using the uploaded image as the base background.
+
+VIDEO INFO:
+- Topic: {topic}
+- Title: {title}
+- Level: {level}
+
+STYLE:
+- Cartoon English-learning YouTube channel
+- Modern clickable YouTube thumbnail
+- Warm cozy lighting
+- Bold thick text
+- Mobile-friendly readability
+- Strong contrast
+- Expressive characters
+- Fun and energetic
+
+THUMBNAIL RULES:
+- Maximum 3-5 words
+- HUGE readable text
+- Black brush background behind text
+- White + yellow + red text colors
+- Large expressive faces
+- Slight zoom-in on characters
+- Keep background visible but slightly blurred
+- Add YouTube-style energy
+- Keep composition clean
+- Avoid clutter
+- Avoid tiny details
+
+TEXT IDEAS:
+- SMALL TALK
+- COFFEE SHOP
+- REAL ENGLISH
+
+IMPORTANT:
+- Make it look like a viral English learning thumbnail
+- Similar to modern YouTube educational thumbnails
+- 16:9 composition
+"""
+
+    logger.info("Calling gpt-image-1 to generate thumbnail…")
+
+    with open(background_path, "rb") as image_file:
+
+        response = client.images.edit(
+            model="gpt-image-1",
+            image=image_file,
+            prompt=thumbnail_prompt,
+            size="1536x1024",
+        )
+
+    image_data = base64.b64decode(response.data[0].b64_json)
+
+    img = Image.open(io.BytesIO(image_data)).convert("RGB")
+    img = img.resize((1280, 720), Image.LANCZOS)
+    img.save(output_path, "PNG")
+
+    logger.info("Thumbnail saved: %s", output_path)
+
+    return output_path

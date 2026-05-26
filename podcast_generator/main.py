@@ -192,9 +192,11 @@ def step6_generate_background() -> Path | None:
 
 
 def step7_generate_thumbnail(level: str, llm_type: int = 1) -> Path | None:
-    """Generate a click-worthy thumbnail over the step6 background image."""
-    logger.info("━━━ STEP 7/8: Generating clickable thumbnail ━━━")
+    """Generate a clickable YouTube thumbnail via GPT-IMAGE-1 using Step 6 background."""
+    logger.info("━━━ STEP 7/8: Generating clickable thumbnail via GPT-IMAGE-1 ━━━")
+
     script = json.loads((TEMP_DIR / "script.json").read_text(encoding="utf-8"))
+
     bg_path = TEMP_DIR / "background.png"
     thumbnail_path = TEMP_DIR / "thumbnail.png"
 
@@ -202,88 +204,27 @@ def step7_generate_thumbnail(level: str, llm_type: int = 1) -> Path | None:
         logger.warning("Thumbnail skipped: background image not available.")
         return None
 
-    from PIL import Image, ImageDraw, ImageFont
-    from script_generator import generate_thumbnail_headline
-
     try:
-        image = Image.open(bg_path).convert("RGB")
-    except Exception as exc:
-        logger.warning("Thumbnail creation failed: %s", exc)
+        from image_generator import generate_thumbnail_image
+
+        generate_thumbnail_image(
+            title=script.get("title", ""),
+            topic=script.get("topic", ""),
+            level=level,
+            background_path=bg_path,
+            output_path=thumbnail_path,
+        )
+
+        logger.info("Thumbnail saved: %s", thumbnail_path)
+        return thumbnail_path
+
+    except RuntimeError as exc:
+        logger.warning("Thumbnail generation skipped: %s", exc)
         return None
 
-    # LLM-generated click-worthy headline, max 5 words, all caps
-    try:
-        headline = generate_thumbnail_headline(script, llm_type)
-        headline_words = headline.split()
-        if len(headline_words) > 5:
-            headline = " ".join(headline_words[:5])
-        headline = headline.upper().strip('"\'"')
-    except Exception:
-        headline = " ".join(script.get("title", "English Podcast").upper().split()[:5])
-
-    width, height = image.size  # 1280x720
-
-    # Dark gradient overlay on bottom half (keeps background visible on top)
-    gradient = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw_grad = ImageDraw.Draw(gradient)
-    for y in range(height // 2, height):
-        alpha = int(220 * (y - height // 2) / max(height // 2 - 1, 1))
-        draw_grad.line([(0, y), (width - 1, y)], fill=(0, 0, 0, alpha))
-    image = Image.alpha_composite(image.convert("RGBA"), gradient).convert("RGB")
-
-    # Find the boldest available font
-    font_path = None
-    for name in ["impact.ttf", "arialbd.ttf", "arial.ttf"]:
-        candidate = Path("C:/Windows/Fonts") / name
-        if candidate.exists():
-            font_path = str(candidate)
-            break
-
-    try:
-        title_font = ImageFont.truetype(font_path or "arial", 90)
-        level_font = ImageFont.truetype(font_path or "arial", 42)
-    except Exception:
-        title_font = ImageFont.load_default()
-        level_font = ImageFont.load_default()
-
-    draw = ImageDraw.Draw(image)
-
-    # Headline with thick outline for contrast
-    text_x = 50
-    text_y = height - 190
-    for dx, dy in [(-4, -4), (-4, 4), (4, -4), (4, 4), (-4, 0), (4, 0), (0, -4), (0, 4)]:
-        draw.text((text_x + dx, text_y + dy), headline, font=title_font, fill=(0, 0, 0))
-    draw.text((text_x, text_y), headline, font=title_font, fill=(255, 255, 255))
-
-    # Level badge — top-right corner, color-coded by CEFR level
-    level_colors = {
-        "A1": (76, 175, 80),
-        "A2": (139, 195, 74),
-        "B1": (255, 193, 7),
-        "B2": (255, 152, 0),
-        "C1": (244, 67, 54),
-        "C2": (156, 39, 176),
-    }
-    badge_color = level_colors.get(level.upper(), (255, 193, 7))
-    badge_text = f"LEVEL {level.upper()}"
-    padding = 18
-    try:
-        bbox = draw.textbbox((0, 0), badge_text, font=level_font)
-        bw = bbox[2] - bbox[0] + padding * 2
-        bh = bbox[3] - bbox[1] + padding * 2
-    except AttributeError:
-        bw, bh = 160, 60  # fallback for old Pillow
-    bx = width - bw - 30
-    by = 30
-    try:
-        draw.rounded_rectangle([bx, by, bx + bw, by + bh], radius=14, fill=badge_color)
-    except AttributeError:
-        draw.rectangle([bx, by, bx + bw, by + bh], fill=badge_color)
-    draw.text((bx + padding, by + padding), badge_text, font=level_font, fill=(255, 255, 255))
-
-    image.save(thumbnail_path, format="PNG")
-    logger.info("Thumbnail saved: %s", thumbnail_path)
-    return thumbnail_path
+    except Exception as exc:
+        logger.warning("Thumbnail generation failed: %s", exc)
+        return None
 
 
 def step8_build_video(output: str | Path) -> Path:
