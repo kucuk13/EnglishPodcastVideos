@@ -180,9 +180,16 @@ def generate_script(
         f'Topic: "{topic}"\n'
         f"Target CEFR level: {level}\n"
         f"Approximate word count: {words} words\n\n"
-        "Write a real-life English conversation. Make it useful, natural, and YouTube-retention friendly.\n"
-        "Start with a direct hook or immediate situation.\n"
-        "Remember: output ONLY raw JSON, no markdown, no extra text."
+        "INSTRUCTIONS FOR HIGH RETENTION:\n"
+        "1. THE HOOK: Do NOT start with 'Hello' or 'Is this seat free'. Start with a specific, intriguing line "
+        "that mentions the most interesting part of the story (e.g., a trip to Japan, a mystery novel plot, or a career change). \n"
+        "2. PATTERN INTERRUPT: Break the 'textbook' flow. Use natural interruptions, 'oh' sounds, and specific details "
+        "like 'Caramel Macchiato' or 'La Bella Vita' instead of just 'coffee' or 'restaurant' .\n"
+        "3. EMOTIONAL CONNECTION: Include personal stories early on, like moving from a big city or missing family, "
+        "to build a bond with the viewer.\n"
+        "4. STRUCTURE: Use a 'In Media Res' start (starting in the middle of a thought) and then loop back to the introduction.\n\n"
+        "Write a natural, real-life English conversation based on these rules. "
+        "Output ONLY raw JSON with keys: 'hook', 'dialogue' (list of speaker/text), 'vocabulary_highlight'."
     )
 
     if llm_type == 2:
