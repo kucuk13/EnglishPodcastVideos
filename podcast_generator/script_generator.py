@@ -189,7 +189,7 @@ def generate_script(
         "to build a bond with the viewer.\n"
         "4. STRUCTURE: Use a 'In Media Res' start (starting in the middle of a thought) and then loop back to the introduction.\n\n"
         "Write a natural, real-life English conversation based on these rules. "
-        "Output ONLY raw JSON with keys: 'hook', 'dialogue' (list of speaker/text), 'vocabulary_highlight'."
+        "Remember: output ONLY raw JSON, no markdown, no extra text."
     )
 
     if llm_type == 2:
