@@ -125,7 +125,24 @@ def _build_turn_clip(
 
     # --- Background ---
     if background_image_path is not None:
-        bg = ImageClip(str(background_image_path)).with_duration(total_duration)
+        # Speaker-based dynamic crop:
+        # Jack konuşurken görüntü hafif sola, Amy konuşurken hafif sağa kayar.
+        zoom = 1.08
+
+        if speaker == "Jack":
+            x_shift = 35
+        elif speaker == "Amy":
+            x_shift = -35
+        else:
+            x_shift = 0
+
+        bg = (
+            ImageClip(str(background_image_path))
+            .resized(zoom)
+            .with_duration(total_duration)
+            .with_position((x_shift, "center"))
+        )
+
         base_layers = [bg]
     else:
         base_layers = [ColorClip(size=(WIDTH, HEIGHT), color=BG_COLOR).with_duration(total_duration)]

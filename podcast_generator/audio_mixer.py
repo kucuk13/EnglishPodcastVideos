@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 TARGET_DBFS = -18.0
-SEGMENT_PEAK_HEADROOM_DB = -1.5
+SEGMENT_PEAK_HEADROOM_DB = -3.0
 
 
 def _prepare_segment(segment: AudioSegment) -> AudioSegment:
@@ -34,7 +34,7 @@ def _prepare_segment(segment: AudioSegment) -> AudioSegment:
 def concatenate_audio(
     wav_paths: list[Path],
     output_path: str | Path,
-    gap_ms: int = 350,
+    gap_ms: int = 400,
 ) -> Path:
     """Concatenate wav files into a single audio file."""
     output_path = Path(output_path)

@@ -168,7 +168,7 @@ def step5_mix_audio() -> Path:
         for p in json.loads((TEMP_DIR / "audio_paths.json").read_text(encoding="utf-8"))
     ]
     combined_audio = TEMP_DIR / "combined.wav"
-    concatenate_audio(audio_paths, combined_audio, gap_ms=350)
+    concatenate_audio(audio_paths, combined_audio, gap_ms=400)
     return combined_audio
 
 
@@ -246,7 +246,7 @@ def step8_build_video(output: str | Path) -> Path:
         audio_paths,
         combined_audio,
         output_path,
-        gap_ms=350,
+        gap_ms=400,
         background_image_path=background_path if background_path.exists() else None,
     )
     return output_path

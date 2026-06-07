@@ -41,10 +41,28 @@ def generate_background_image(title: str, topic: str, output_path: Path) -> Path
     client = openai.OpenAI(api_key=api_key)
 
     prompt = (
-        f"Two friendly characters (a man and a woman) having a simple everyday conversation about {topic}."
-        "Scene includes a clear background related to the topic (cafe, airport, park, shop, etc)."
-        "No speech bubbles."
-        "Cartoon style, 16:9 aspect ratio."
+        f"Two friendly characters having a simple everyday conversation about {topic}. "
+
+        "Amy is positioned on the far LEFT side of the frame. "
+        "Jack is positioned on the far RIGHT side of the frame. "
+        "Never swap their positions. "
+        
+        "Both characters are visible from the waist up. "
+        "They are facing each other naturally. "
+
+        "The background clearly represents the topic "
+        "(cafe, airport, park, office, restaurant, shop, hotel, etc). "
+
+        "Bright vibrant colors. "
+        "Modern educational illustration. "
+        "High contrast. "
+        "Clean composition. "
+        "Professional YouTube educational style. "
+
+        "No speech bubbles. "
+        "No text. "
+        "No captions. "
+        "16:9 aspect ratio."
     )
 
     logger.info("Calling gpt-image-1 to generate background image…")
