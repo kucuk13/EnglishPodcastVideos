@@ -131,8 +131,8 @@ def _build_turn_clip(
         base_layers = [ColorClip(size=(WIDTH, HEIGHT), color=BG_COLOR).with_duration(total_duration)]
 
     # --- Bottom bar ---
-    BAR_HEIGHT = 210
-    bar_y = HEIGHT - BAR_HEIGHT  # 510
+    BAR_HEIGHT = 230
+    bar_y = HEIGHT - BAR_HEIGHT  # 490
 
     bar_bg = (
         ColorClip(size=(WIDTH, BAR_HEIGHT), color=(0, 0, 0))
@@ -171,31 +171,74 @@ def _build_turn_clip(
         method="label",
     ).with_duration(total_duration).with_position((TEXT_START_X, HEADER_CENTER_Y - LABEL_FONT_SIZE // 2))
 
-    # --- Subtitle text (auto-shrink to fit available bar area) ---
-    RIGHT_MARGIN = 20
+    # --- Subtitle text: bigger + split long text into timed chunks ---
+    RIGHT_MARGIN = 24
     SUBTITLE_AVAILABLE_WIDTH = WIDTH - TEXT_START_X - RIGHT_MARGIN
-    SUBTITLE_AVAILABLE_HEIGHT = BAR_HEIGHT - 90 - 10  # bar height minus header area minus bottom padding
-    MAX_SUBTITLE_FONT = 32
-    MIN_SUBTITLE_FONT = 14
+
+    MAX_SUBTITLE_FONT = 44
+    MIN_SUBTITLE_FONT = 34
+
     subtitle_color = f"rgb({SUBTITLE_TEXT_COLOR[0]},{SUBTITLE_TEXT_COLOR[1]},{SUBTITLE_TEXT_COLOR[2]})"
 
-    subtitle_text = None
-    for font_size in range(MAX_SUBTITLE_FONT, MIN_SUBTITLE_FONT - 1, -2):
-        chars_per_line = max(20, int(SUBTITLE_AVAILABLE_WIDTH / (font_size * 17 / 32)))
-        wrapped = "\n".join(textwrap.wrap(text, width=chars_per_line, break_long_words=False, break_on_hyphens=False))
-        candidate = TextClip(
-            text=wrapped,
-            font_size=font_size,
-            color=subtitle_color,
-            font=FONT_REGULAR,
-            method="label",
-        )
-        if candidate.size[1] <= SUBTITLE_AVAILABLE_HEIGHT or font_size == MIN_SUBTITLE_FONT:
-            subtitle_text = candidate.with_duration(total_duration).with_position((TEXT_START_X, bar_y + 90))
-            break
-        candidate.close()
+    subtitle_chunks = _split_subtitle_text(text, max_chars=74)
 
-    layers = [*base_layers, bar_bg, speaker_label, subtitle_text]
+    # Only show subtitles during spoken audio, not during gap
+    spoken_duration = max(0.1, duration)
+
+    total_words = sum(len(chunk.split()) for chunk in subtitle_chunks)
+    current_start = 0.0
+    subtitle_layers = []
+
+    for i, chunk in enumerate(subtitle_chunks):
+        word_count = len(chunk.split())
+
+        if i == len(subtitle_chunks) - 1:
+            chunk_duration = spoken_duration - current_start
+        else:
+            chunk_duration = spoken_duration * (word_count / total_words)
+
+        chunk_duration = max(0.4, chunk_duration)
+
+        subtitle_clip = None
+
+        for font_size in range(MAX_SUBTITLE_FONT, MIN_SUBTITLE_FONT - 1, -2):
+            chars_per_line = max(
+                24,
+                int(SUBTITLE_AVAILABLE_WIDTH / (font_size * 0.56))
+            )
+
+            wrapped = "\n".join(
+                textwrap.wrap(
+                    chunk,
+                    width=chars_per_line,
+                    break_long_words=False,
+                    break_on_hyphens=False,
+                )
+            )
+
+            candidate = TextClip(
+                text=wrapped,
+                font_size=font_size,
+                color=subtitle_color,
+                font=FONT_BOLD,
+                method="label",
+            )
+
+            if candidate.size[1] <= 96 or font_size == MIN_SUBTITLE_FONT:
+                subtitle_clip = (
+                    candidate
+                    .with_start(current_start)
+                    .with_duration(chunk_duration)
+                    .with_position((TEXT_START_X, bar_y + 92))
+                )
+                break
+
+            candidate.close()
+
+        subtitle_layers.append(subtitle_clip)
+        current_start += chunk_duration
+
+    layers = [*base_layers, bar_bg, speaker_label, *subtitle_layers]
     try:
         layers.insert(len(base_layers) + 1, pulsing_circle)
     except Exception:
@@ -203,6 +246,26 @@ def _build_turn_clip(
 
     return CompositeVideoClip(layers, size=(WIDTH, HEIGHT)).with_duration(total_duration)
 
+
+def _split_subtitle_text(text: str, max_chars: int = 72) -> list[str]:
+    """Split long subtitle into readable chunks."""
+    words = text.split()
+    chunks = []
+    current = ""
+
+    for word in words:
+        test = f"{current} {word}".strip()
+        if len(test) <= max_chars:
+            current = test
+        else:
+            if current:
+                chunks.append(current)
+            current = word
+
+    if current:
+        chunks.append(current)
+
+    return chunks
 
 
 def build_video(
@@ -290,7 +353,6 @@ def build_video(
             audio.close()
         except Exception:
             pass
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

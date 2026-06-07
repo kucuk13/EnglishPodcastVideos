@@ -120,11 +120,6 @@ THUMBNAIL RULES:
 - Avoid clutter
 - Avoid tiny details
 
-TEXT IDEAS:
-- SMALL TALK
-- COFFEE SHOP
-- REAL ENGLISH
-
 IMPORTANT:
 - Make it look like a viral English learning thumbnail
 - Similar to modern YouTube educational thumbnails
