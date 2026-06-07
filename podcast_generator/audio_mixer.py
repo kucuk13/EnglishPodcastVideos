@@ -3,31 +3,40 @@ audio_mixer.py — Concatenate TTS audio segments with pydub.
 
 Joins all per-turn wav files into a single audio track, inserting
 configurable silence gaps between turns.
+
+Also normalizes each segment for more consistent YouTube voice volume.
 """
 
 import logging
 from pathlib import Path
 
 from pydub import AudioSegment
+from pydub.effects import normalize
 
 logger = logging.getLogger(__name__)
+
+
+TARGET_DBFS = -18.0
+SEGMENT_PEAK_HEADROOM_DB = -1.5
+
+
+def _prepare_segment(segment: AudioSegment) -> AudioSegment:
+    """Normalize one TTS segment to a comfortable voice level."""
+    segment = normalize(segment, headroom=SEGMENT_PEAK_HEADROOM_DB)
+
+    if segment.dBFS != float("-inf"):
+        change_db = TARGET_DBFS - segment.dBFS
+        segment = segment.apply_gain(change_db)
+
+    return segment
 
 
 def concatenate_audio(
     wav_paths: list[Path],
     output_path: str | Path,
-    gap_ms: int = 200,
+    gap_ms: int = 350,
 ) -> Path:
-    """Concatenate wav files into a single audio file.
-
-    Args:
-        wav_paths: Ordered list of wav file paths to join.
-        output_path: Path for the combined output audio file.
-        gap_ms: Silence gap (in milliseconds) to insert between turns.
-
-    Returns:
-        Path to the combined audio file.
-    """
+    """Concatenate wav files into a single audio file."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -38,9 +47,14 @@ def concatenate_audio(
 
     for idx, wav_path in enumerate(wav_paths):
         segment = AudioSegment.from_file(str(wav_path))
+        segment = _prepare_segment(segment)
+
         logger.debug(
-            "Segment %d: %s — %.1f s",
-            idx, wav_path.name, len(segment) / 1000.0,
+            "Segment %d: %s — %.1f s — %.1f dBFS",
+            idx,
+            wav_path.name,
+            len(segment) / 1000.0,
+            segment.dBFS,
         )
 
         if idx > 0:
@@ -57,14 +71,7 @@ def concatenate_audio(
 
 
 def get_segment_durations(wav_paths: list[Path]) -> list[float]:
-    """Get the duration (in seconds) of each wav segment.
-
-    Args:
-        wav_paths: List of wav file paths.
-
-    Returns:
-        List of durations in seconds.
-    """
+    """Get the duration in seconds of each wav segment."""
     durations = []
     for wav_path in wav_paths:
         segment = AudioSegment.from_file(str(wav_path))
