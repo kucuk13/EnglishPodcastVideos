@@ -88,7 +88,7 @@ def _synthesize_all_openai(turns: list[dict], temp_dir: Path) -> list[Path]:
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set — cannot use OpenAI TTS.")
 
-    client = openai.OpenAI(api_key=api_key)
+    client = openai.OpenAI(api_key=api_key, timeout=60, max_retries=0)
     output_paths: list[Path] = []
 
     for idx, turn in enumerate(tqdm(turns, desc="OpenAI TTS", unit="turn")):
@@ -106,12 +106,24 @@ def _synthesize_all_openai(turns: list[dict], temp_dir: Path) -> list[Path]:
 
         for attempt in range(max_retries):
             try:
-                response = client.audio.speech.create(
+                logger.info(
+                    "Synthesizing turn %d/%d (%s, %d chars)",
+                    idx + 1,
+                    len(turns),
+                    speaker,
+                    len(turn["text"]),
+                )
+
+                with client.audio.speech.with_streaming_response.create(
                     model="tts-1",
                     voice=voice,
                     input=turn["text"],
-                )
-                response.stream_to_file(str(output_path))
+                ) as response:
+                    response.stream_to_file(str(output_path))
+
+                if not output_path.exists() or output_path.stat().st_size == 0:
+                    raise RuntimeError("Generated audio file is empty")
+
                 output_paths.append(output_path)
 
                 # burst yememek için küçük pacing
@@ -131,6 +143,16 @@ def _synthesize_all_openai(turns: list[dict], temp_dir: Path) -> list[Path]:
                 logger.warning(
                     "OpenAI API error at turn %d: %s. Retrying in %ds...",
                     idx, e, wait
+                )
+                time.sleep(wait)
+
+            except Exception as e:
+                wait = delay * (2 ** attempt)
+                logger.warning(
+                    "Unexpected TTS error at turn %d: %r. Retrying in %ds...",
+                    idx,
+                    e,
+                    wait,
                 )
                 time.sleep(wait)
         else:
