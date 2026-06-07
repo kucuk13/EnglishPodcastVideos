@@ -42,10 +42,6 @@ def generate_background_image(title: str, topic: str, output_path: Path) -> Path
 
     prompt = (
         f"Two friendly characters having a simple everyday conversation about {topic}. "
-
-        "Amy is positioned on the far LEFT side of the frame. "
-        "Jack is positioned on the far RIGHT side of the frame. "
-        "Never swap their positions. "
         
         "Both characters are visible from the waist up. "
         "They are facing each other naturally. "
@@ -112,7 +108,6 @@ Create a HIGH-CTR YouTube thumbnail using the uploaded image as the base backgro
 
 VIDEO INFO:
 - Topic: {topic}
-- Title: {title}
 - Level: {level}
 
 STYLE:
