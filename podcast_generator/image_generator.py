@@ -54,7 +54,7 @@ def generate_background_image(title: str, topic: str, output_path: Path) -> Path
         "(cafe, airport, park, office, restaurant, shop, hotel, etc). "
 
         "Bright vibrant colors. "
-        "Modern educational illustration. "
+        "Pixar-inspired educational illustration. "
         "High contrast. "
         "Clean composition. "
         "Professional YouTube educational style. "
