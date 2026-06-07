@@ -1,7 +1,7 @@
 """
 video_builder.py — moviepy video assembly for podcast.
 
-Creates a 1280x720 video with:
+Creates a 1920x1080 video with:
 - Speaker name and word-wrapped dialogue text
 - Animated pulsing circle near speaker label
 - Subtitle bar at the bottom
@@ -22,13 +22,13 @@ from moviepy import (
     VideoClip,
     concatenate_videoclips,
 )
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 logger = logging.getLogger(__name__)
 
 # Video dimensions
-WIDTH = 1280
-HEIGHT = 720
+WIDTH = 1920
+HEIGHT = 1080
 FPS = 24
 
 # Colors
@@ -125,10 +125,26 @@ def _build_turn_clip(
 
     # --- Background ---
     if background_image_path is not None:
-        bg = ImageClip(str(background_image_path)).with_duration(total_duration)
+        img = Image.open(background_image_path).convert("RGB")
+
+        # Her görseli videoya sığdırır:
+        # - boşluk bırakmaz
+        # - oranı korur
+        # - gerekiyorsa kenarlardan kırpar
+        img = ImageOps.fit(
+            img,
+            (WIDTH, HEIGHT),
+            method=Image.Resampling.LANCZOS,
+            centering=(0.5, 0.5),
+        )
+
+        bg = ImageClip(np.array(img)).with_duration(total_duration)
         base_layers = [bg]
     else:
-        base_layers = [ColorClip(size=(WIDTH, HEIGHT), color=BG_COLOR).with_duration(total_duration)]
+        base_layers = [
+            ColorClip(size=(WIDTH, HEIGHT), color=BG_COLOR)
+            .with_duration(total_duration)
+        ]
 
     # --- Bottom bar ---
     BAR_HEIGHT = 230
