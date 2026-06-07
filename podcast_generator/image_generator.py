@@ -108,10 +108,8 @@ Create a HIGH-CTR YouTube thumbnail using the uploaded image as the base backgro
 
 VIDEO INFO:
 - Topic: {topic}
-- Level: {level}
 
 STYLE:
-- Cartoon English-learning YouTube channel
 - Modern clickable YouTube thumbnail
 - Warm cozy lighting
 - Bold thick text
