@@ -180,7 +180,7 @@ def _build_turn_clip(
 
     subtitle_color = f"rgb({SUBTITLE_TEXT_COLOR[0]},{SUBTITLE_TEXT_COLOR[1]},{SUBTITLE_TEXT_COLOR[2]})"
 
-    subtitle_chunks = _split_subtitle_text(text, max_chars=74)
+    subtitle_chunks = _split_subtitle_text(text, max_chars=82)
 
     # Only show subtitles during spoken audio, not during gap
     spoken_duration = max(0.1, duration)
@@ -247,14 +247,15 @@ def _build_turn_clip(
     return CompositeVideoClip(layers, size=(WIDTH, HEIGHT)).with_duration(total_duration)
 
 
-def _split_subtitle_text(text: str, max_chars: int = 72) -> list[str]:
-    """Split long subtitle into readable chunks."""
+def _split_subtitle_text(text: str, max_chars: int = 82, min_last_words: int = 3) -> list[str]:
+    """Split long subtitle into readable chunks, avoiding tiny last chunks."""
     words = text.split()
     chunks = []
     current = ""
 
     for word in words:
         test = f"{current} {word}".strip()
+
         if len(test) <= max_chars:
             current = test
         else:
@@ -264,6 +265,11 @@ def _split_subtitle_text(text: str, max_chars: int = 72) -> list[str]:
 
     if current:
         chunks.append(current)
+
+    # Avoid orphan last chunk like: "it."
+    if len(chunks) >= 2 and len(chunks[-1].split()) < min_last_words:
+        last = chunks.pop()
+        chunks[-1] = f"{chunks[-1]} {last}"
 
     return chunks
 
