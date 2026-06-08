@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # Video dimensions
 WIDTH = 1920
 HEIGHT = 1080
-FPS = 24
+FPS = 12
 
 # Colors
 BG_COLOR = (18, 18, 24)
@@ -147,7 +147,7 @@ def _build_turn_clip(
         ]
 
     # --- Bottom bar ---
-    BAR_HEIGHT = 230
+    BAR_HEIGHT = 300
     bar_y = HEIGHT - BAR_HEIGHT  # 490
 
     bar_bg = (
@@ -158,9 +158,9 @@ def _build_turn_clip(
     )
 
     # --- Pulsing dot (left of bar, vertically centered with speaker name) ---
-    circle_size = 72
+    circle_size = 90
     dot_x = 44
-    LABEL_FONT_SIZE = 36
+    LABEL_FONT_SIZE = 50
     HEADER_CENTER_Y = bar_y + 46   # shared vertical center for dot and label
     dot_y = HEADER_CENTER_Y - circle_size // 2   # top of 72px canvas → center lands on HEADER_CENTER_Y
 
@@ -191,8 +191,8 @@ def _build_turn_clip(
     RIGHT_MARGIN = 24
     SUBTITLE_AVAILABLE_WIDTH = WIDTH - TEXT_START_X - RIGHT_MARGIN
 
-    MAX_SUBTITLE_FONT = 44
-    MIN_SUBTITLE_FONT = 34
+    MAX_SUBTITLE_FONT = 58
+    MIN_SUBTITLE_FONT = 54
 
     subtitle_color = f"rgb({SUBTITLE_TEXT_COLOR[0]},{SUBTITLE_TEXT_COLOR[1]},{SUBTITLE_TEXT_COLOR[2]})"
 
@@ -344,7 +344,7 @@ def build_video(
             fps=FPS,
             codec="h264_nvenc", #libx264
             audio_codec="aac",
-            preset="p1",
+            preset="p4",
             audio=str(combined_audio_path),
             ffmpeg_params=[
                 "-rc", "vbr",
